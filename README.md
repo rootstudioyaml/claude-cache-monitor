@@ -1,5 +1,10 @@
 # claude-cache-monitor
 
+> 📺 **HNPulse Shorts** — 이 도구가 만들어진 배경 (캐시 TTL 1h→5m 변경 이슈):
+> **[▶ Watch the Short](https://www.youtube.com/shorts/oSx2sg935nI)** · [All HNPulse Shorts](https://www.youtube.com/@HNPulseKR/shorts)
+>
+> [![HNPulse Short](https://img.youtube.com/vi/oSx2sg935nI/hqdefault.jpg)](https://www.youtube.com/shorts/oSx2sg935nI)
+
 Prompt cache hit rate monitoring tool for Claude Code subscribers.
 
 After Anthropic's silent cache TTL change (1h to 5m) in March 2026, subscription plan users have no way to check cache performance from the Console dashboard. This tool analyzes local session logs (`~/.claude/projects/`) to show cache hit rates, TTL distribution, and cost impact.
@@ -130,7 +135,7 @@ Zero dependencies.
 
 - [GitHub Issue #46829](https://github.com/anthropics/claude-code/issues/46829): Cache TTL regression analysis
 - [HN Discussion](https://news.ycombinator.com/item?id=47736476): Community reaction (168 points, 142 comments)
-- [HNPulse KR](https://www.youtube.com/@HNPulseKR): Hacker News tech deep-dives in Korean
+- [HNPulse KR](https://www.youtube.com/@HNPulseKR): Hacker News tech deep-dives in Korean ([Shorts](https://www.youtube.com/@HNPulseKR/shorts))
 
 ## License
 

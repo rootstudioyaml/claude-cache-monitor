@@ -1,6 +1,6 @@
 {
   "name": "claude-cache-monitor",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Monitor prompt cache hit rates for Claude Code sessions",
   "type": "module",
   "bin": {
