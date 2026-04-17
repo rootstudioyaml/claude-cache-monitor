@@ -59,7 +59,7 @@ When the hook is installed:
   ══════════════════════════════════════════════════
 
   Summary
-  Sessions: 380  |  API calls: 10,813  |  Model: claude-sonnet
+  Sessions: 380  |  API calls: 10,813  |  Model: claude-opus-new
   Cache hit rate: 98.2%  |  Total input: 1957.94M tokens
 
   TTL Breakdown
@@ -124,6 +124,23 @@ Cache TTL is determined by your subscription plan, not by user choice:
 | **Max** ($100~200/mo) | **1h automatic** | `tengu_prompt_cache_1h_config` feature flag |
 | **Pro** ($20/mo) | **5m fixed** | Not configurable |
 | **API key** | **5m default** (1h via beta header) | `cache_control.ttl` parameter |
+
+## Pricing (updated 2026-04 for Opus 4.7)
+
+Cost estimates use current Anthropic pricing, auto-detected from the model id in session logs:
+
+| Tier (internal id) | Matching models | Input | 5m Cache Write | 1h Cache Write | Cache Read | Output |
+|---|---|---|---|---|---|---|
+| `claude-opus-new` | Opus **4.5 / 4.6 / 4.7** | $5 | $6.25 | $10 | $0.50 | $25 |
+| `claude-opus-legacy` | Opus 4 / 4.1 / 3 | $15 | $18.75 | $30 | $1.50 | $75 |
+| `claude-sonnet` | Sonnet 3.7 / 4 / 4.5 / 4.6 | $3 | $3.75 | $6 | $0.30 | $15 |
+| `claude-haiku-4-5` | Haiku 4.5 | $1 | $1.25 | $2 | $0.10 | $5 |
+| `claude-haiku-3-5` | Haiku 3.5 | $0.80 | $1 | $1.6 | $0.08 | $4 |
+| `claude-haiku-3` | Haiku 3 | $0.25 | $0.30 | $0.50 | $0.03 | $1.25 |
+
+5m and 1h cache writes are now billed at separate rates (previously applied a single blended rate). Prior versions (≤ 1.0.x) used legacy Opus 4 pricing for all Opus models, over-estimating Opus 4.5+ costs by ~3x — **upgrade to 1.1.0 if you run Opus 4.5 or newer**.
+
+Source: [Anthropic pricing documentation](https://docs.claude.com/en/docs/about-claude/pricing)
 
 ## Platform Support
 
