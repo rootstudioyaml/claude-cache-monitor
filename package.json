@@ -1,7 +1,7 @@
 {
   "name": "claude-cache-monitor",
-  "version": "1.1.0",
-  "description": "Monitor prompt cache hit rates for Claude Code sessions",
+  "version": "1.2.0",
+  "description": "Monitor prompt cache hit rates for Claude Code sessions (with statusline mode)",
   "type": "module",
   "bin": {
     "claude-cache-monitor": "./bin/cli.js"
@@ -20,7 +20,9 @@
     "cache",
     "monitoring",
     "prompt-caching",
-    "cli"
+    "cli",
+    "statusline",
+    "claude-code"
   ],
   "license": "MIT",
   "repository": {

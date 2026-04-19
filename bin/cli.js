@@ -12,6 +12,9 @@
  *   npx claude-cache-monitor --install-hook     # install PostToolUse hook
  *   npx claude-cache-monitor --uninstall-hook   # remove hook
  *   npx claude-cache-monitor --hook-run         # internal: called by hook
+ *   npx claude-cache-monitor --statusline       # one-line output for Claude Code statusline API
+ *   npx claude-cache-monitor --statusline --verbose  # longer labels
+ *   npx claude-cache-monitor --statusline --no-color # strip ANSI colors
  */
 
 import { parseAllSessions } from '../src/parser.js';
@@ -51,9 +54,14 @@ async function main() {
     return;
   }
 
+  // Statusline mode shortcut
+  const isStatusline = hasFlag('--statusline') || getArg('--format') === 'statusline';
+
   // Report generation
-  const days = parseInt(getArg('--days') || getArg('-d') || '30', 10);
-  const format = getArg('--format') || getArg('-f') || 'table';
+  // Statusline default = 7 days (fast, called every ~300ms). Others = 30 days.
+  const defaultDays = isStatusline ? 7 : 30;
+  const days = parseInt(getArg('--days') || getArg('-d') || String(defaultDays), 10);
+  const format = isStatusline ? 'statusline' : (getArg('--format') || getArg('-f') || 'table');
   const projectFilter = getArg('--project') || getArg('-p');
 
   if (format === 'table') {
@@ -63,6 +71,14 @@ async function main() {
   const sessions = await parseAllSessions({ days, projectFilter });
 
   if (sessions.length === 0) {
+    // Statusline must always emit a single line (no multi-line help spam every 300ms)
+    if (format === 'statusline') {
+      const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR;
+      const gray = colorOk ? '\x1b[90m' : '';
+      const reset = colorOk ? '\x1b[0m' : '';
+      console.log(`${gray}🧠 no session data · ${days}d${reset}`);
+      return;
+    }
     console.log('No session data found for the given period.');
     console.log('');
     console.log('This tool analyzes Claude Code session logs (~/.claude/projects/).');
@@ -90,6 +106,10 @@ async function main() {
   } else if (format === 'csv') {
     const { formatReport } = await import('../src/formatters/csv.js');
     output = formatReport(data);
+  } else if (format === 'statusline') {
+    const { formatReport } = await import('../src/formatters/statusline.js');
+    const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR;
+    output = formatReport(data, { color: colorOk, verbose: hasFlag('--verbose') });
   } else {
     const { formatReport } = await import('../src/formatters/table.js');
     output = formatReport(data);
@@ -99,6 +119,15 @@ async function main() {
 }
 
 main().catch((err) => {
+  // Statusline mode must never spam multi-line errors (called every ~300ms)
+  const isStatusline = process.argv.includes('--statusline') || process.argv.includes('statusline');
+  if (isStatusline) {
+    const colorOk = !process.argv.includes('--no-color') && !process.env.NO_COLOR;
+    const red = colorOk ? '\x1b[31m' : '';
+    const reset = colorOk ? '\x1b[0m' : '';
+    console.log(`${red}🧠 error${reset}`);
+    process.exit(0);
+  }
   console.error('Error:', err.message);
   process.exit(1);
 });

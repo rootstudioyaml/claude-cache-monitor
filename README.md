@@ -31,6 +31,45 @@ npx claude-cache-monitor --format json
 npx claude-cache-monitor --format csv
 ```
 
+## Statusline Mode (new in v1.2.0)
+
+Always-on one-line display in Claude Code's native statusline — no need to run commands manually.
+
+Claude Code 내장 statusline에 한 줄로 상시 표시. 커맨드 수동 실행 불필요.
+
+```bash
+# Preview (prints one line)
+npx claude-cache-monitor --statusline
+#  → 🧠 97.5% · 1h · 💰 $4.8K · 7d
+
+# Verbose (longer labels)
+npx claude-cache-monitor --statusline --verbose
+#  → 🧠 97.5% · 1h TTL · 💰 $4.8K saved · 7d
+
+# No ANSI color (plain text)
+npx claude-cache-monitor --statusline --no-color
+```
+
+### Enable in Claude Code
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "npx claude-cache-monitor --statusline"
+  }
+}
+```
+
+Claude Code calls this every ~300ms and displays the output in the statusline bar. Colors are emitted when the terminal supports them:
+
+- **Hit rate** — 🟢 ≥85% · 🟡 70–85% · 🔴 <70%
+- **TTL** — 🟢 1h (good) · 🟡 5m (warning)
+
+Statusline mode uses the last 7 days by default (override with `--days N`) and never emits multi-line errors, so your statusline stays clean even when there's no session data yet.
+
 ## Hook Setup
 
 Automatically logs cache stats on every tool call and alerts when hit rate drops below a threshold.
@@ -98,6 +137,9 @@ When the hook is installed:
 | `--threshold` | Cache hit rate alert threshold (0.0-1.0) | 0.7 |
 | `--install-hook` | Install Claude Code PostToolUse hook | - |
 | `--uninstall-hook` | Remove hook | - |
+| `--statusline` | Emit one-line output for Claude Code statusline API | - |
+| `--verbose` | (with `--statusline`) use longer labels | - |
+| `--no-color` | Strip ANSI escape codes | - |
 
 ## How It Works
 
