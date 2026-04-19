@@ -40,15 +40,30 @@ Claude Code 내장 statusline에 한 줄로 상시 표시. 커맨드 수동 실�
 ```bash
 # Preview (prints one line)
 npx claude-cache-monitor --statusline
-#  → 🧠 97.5% · 1h · 💰 $4.8K · 7d
+#  → 🧠 97.5% · 1h · ⏱ 42:15 · 💰 $4.8K · 7d
 
 # Verbose (longer labels)
 npx claude-cache-monitor --statusline --verbose
-#  → 🧠 97.5% · 1h TTL · 💰 $4.8K saved · 7d
+#  → 🧠 97.5% · 1h TTL · ⏱ 42:15 left · 💰 $4.8K saved · 7d
+
+# Hide the TTL countdown
+npx claude-cache-monitor --statusline --no-timer
 
 # No ANSI color (plain text)
 npx claude-cache-monitor --statusline --no-color
 ```
+
+### TTL countdown (v1.2.1)
+
+Your subscription plan fixes the TTL bucket (5m for Pro, 1h for Max) — the actionable number isn't the bucket, it's **how much time is left on your last API call's cache entry**. The `⏱ MM:SS` segment is a live stopwatch:
+
+구독 플랜이 TTL 값(Pro = 5분, Max = 1시간)을 고정하므로 의미 있는 수치는 "버킷"이 아니라 "마지막 API 호출의 캐시가 만료되기까지 몇 초"입니다. `⏱ MM:SS` 세그먼트가 그 스톱워치입니다:
+
+- 🟢 &gt;30% remaining — plenty of time to send the next prompt within TTL
+- 🟡 10–30% remaining — consider firing a cheap prompt soon to keep prefix cached
+- 🔴 &lt;10% remaining or `EXPIRED` — next prompt will pay cache-write cost again
+
+This enables the "5-minute rule" in practice: a quick dummy question before the timer hits zero resets the TTL and preserves the prefix cache.
 
 ### Enable in Claude Code
 
@@ -139,6 +154,7 @@ When the hook is installed:
 | `--uninstall-hook` | Remove hook | - |
 | `--statusline` | Emit one-line output for Claude Code statusline API | - |
 | `--verbose` | (with `--statusline`) use longer labels | - |
+| `--no-timer` | (with `--statusline`) hide the TTL countdown | show |
 | `--no-color` | Strip ANSI escape codes | - |
 
 ## How It Works

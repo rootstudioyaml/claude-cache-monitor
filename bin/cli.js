@@ -97,7 +97,12 @@ async function main() {
   const anomalies = detectAnomalies(trend);
   const cost = estimateCost(sum, sessions[0]?.model);
 
-  const data = { summary: sum, trend, ttl, anomalies, cost, options: { days } };
+  // Last API activity across all sessions — feeds the statusline TTL countdown.
+  const lastActivity = sessions
+    .map((s) => (s.endTime ? s.endTime.getTime() : 0))
+    .reduce((a, b) => Math.max(a, b), 0);
+
+  const data = { summary: sum, trend, ttl, anomalies, cost, options: { days }, lastActivity };
 
   let output;
   if (format === 'json') {
@@ -109,7 +114,11 @@ async function main() {
   } else if (format === 'statusline') {
     const { formatReport } = await import('../src/formatters/statusline.js');
     const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR;
-    output = formatReport(data, { color: colorOk, verbose: hasFlag('--verbose') });
+    output = formatReport(data, {
+      color: colorOk,
+      verbose: hasFlag('--verbose'),
+      timer: !hasFlag('--no-timer'),
+    });
   } else {
     const { formatReport } = await import('../src/formatters/table.js');
     output = formatReport(data);
