@@ -88,9 +88,13 @@ export async function parseSessionFile(filePath) {
  * Discover all session JSONL files under ~/.claude/projects/
  */
 export async function discoverSessionFiles(options = {}) {
-  const { projectFilter, days = 30 } = options;
+  const { projectFilter, days = 30, excludeSessionPath } = options;
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const files = [];
+  // Resolve the excluded session to an absolute path so equality checks are exact.
+  const excludeAbs = excludeSessionPath
+    ? (excludeSessionPath.startsWith('/') ? excludeSessionPath : join(process.cwd(), excludeSessionPath))
+    : null;
 
   let projectDirs;
   try {
@@ -113,6 +117,7 @@ export async function discoverSessionFiles(options = {}) {
     for (const entry of entries) {
       if (!entry.endsWith('.jsonl')) continue;
       const fp = join(projPath, entry);
+      if (excludeAbs && fp === excludeAbs) continue;
       try {
         const s = await stat(fp);
         if (s.mtimeMs >= cutoff) {

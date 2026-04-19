@@ -15,6 +15,11 @@
  *   npx claude-cache-monitor --statusline       # one-line output for Claude Code statusline API
  *   npx claude-cache-monitor --statusline --verbose  # longer labels
  *   npx claude-cache-monitor --statusline --no-color # strip ANSI colors
+ *   npx claude-cache-monitor --statusline --icon     # use 🧠 ⏳ 💰 icons
+ *   npx claude-cache-monitor --statusline --no-timer # hide the TTL countdown
+ *   npx claude-cache-monitor --statusline --exclude-session <path>
+ *                                               # exclude a JSONL path from lastActivity
+ *                                               # (or set CACHE_MONITOR_EXCLUDE_SESSION env var)
  */
 
 import { parseAllSessions } from '../src/parser.js';
@@ -68,7 +73,12 @@ async function main() {
     process.stderr.write('Scanning session files...\n');
   }
 
-  const sessions = await parseAllSessions({ days, projectFilter });
+  // Exclude the current Claude Code session when computing lastActivity —
+  // otherwise the agent's own tool calls reset the countdown every few seconds.
+  const excludeSessionPath =
+    getArg('--exclude-session') || process.env.CACHE_MONITOR_EXCLUDE_SESSION || undefined;
+
+  const sessions = await parseAllSessions({ days, projectFilter, excludeSessionPath });
 
   if (sessions.length === 0) {
     // Statusline must always emit a single line (no multi-line help spam every 300ms)
