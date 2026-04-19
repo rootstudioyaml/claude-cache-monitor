@@ -77,19 +77,15 @@ export function formatReport(data, { color = true, verbose = false, timer = true
 
   const c = (v) => (color ? v : '');
 
-  const hitSeg = verbose
-    ? `${c(BOLD)}Cache hit${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`
-    : `${c(BOLD)}Cache${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
-  const saveSeg = verbose
-    ? `${c(CYAN)}Saved${c(RESET)} ${formatMoney(savings)}`
-    : `${c(CYAN)}Saved${c(RESET)} ${formatMoney(savings)}`;
+  const hitSeg = `${c(BOLD)}Cache hit${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
+  const saveSeg = `${c(CYAN)}Cost saved${c(RESET)} ${formatMoney(savings)}`;
   const periodSeg = verbose
     ? `${c(GRAY)}last ${options.days}d${c(RESET)}`
     : `${c(GRAY)}${options.days}d${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
-  // When a countdown exists we absorb the bucket label into it ("TTL 1h 59:58")
-  // so the stopwatch reads as "cache expires in MM:SS" instead of a loose emoji.
+  // Label is "Expires" (natural reading) with the bucket in-line so the
+  // stopwatch reads as "Expires 1h 59:58" (= "1h bucket, 59:58 left").
   let ttlSeg;
   if (timer && lastActivity) {
     const elapsed = (Date.now() - lastActivity) / 1000;
@@ -102,12 +98,12 @@ export function formatReport(data, { color = true, verbose = false, timer = true
       pct > 0.10 ? YELLOW :
       RED;
     ttlSeg = verbose
-      ? `${c(bucketColor)}${bucketLabel} TTL${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`
-      : `${c(bucketColor)}TTL ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+      ? `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`
+      : `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
   } else {
     ttlSeg = verbose
-      ? `${c(bucketColor)}${bucketLabel} TTL${c(RESET)}`
-      : `${c(bucketColor)}TTL ${bucketLabel}${c(RESET)}`;
+      ? `${c(bucketColor)}${bucketLabel} bucket${c(RESET)}`
+      : `${c(bucketColor)}Bucket ${bucketLabel}${c(RESET)}`;
   }
 
   return [hitSeg, ttlSeg, saveSeg, periodSeg].join(' · ');
