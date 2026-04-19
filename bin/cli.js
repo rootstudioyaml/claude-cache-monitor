@@ -114,10 +114,12 @@ async function main() {
   } else if (format === 'statusline') {
     const { formatReport } = await import('../src/formatters/statusline.js');
     const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR;
+    const mode = hasFlag('--icon') ? 'icon' : 'text';
     output = formatReport(data, {
       color: colorOk,
       verbose: hasFlag('--verbose'),
       timer: !hasFlag('--no-timer'),
+      mode,
     });
   } else {
     const { formatReport } = await import('../src/formatters/table.js');

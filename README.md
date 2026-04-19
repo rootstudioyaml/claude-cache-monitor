@@ -38,13 +38,20 @@ Always-on one-line display in Claude Code's native statusline — no need to run
 Claude Code 내장 statusline에 한 줄로 상시 표시. 커맨드 수동 실행 불필요.
 
 ```bash
-# Preview (prints one line)
+# Preview (prints one line — text mode, default)
 npx claude-cache-monitor --statusline
 #  → Cache hit 97.5% · Expires 1h 42:15 · Cost saved $4.8K · 7d
 
-# Verbose (longer labels)
+# Icon mode (🧠 / ⏳ / 💰)
+npx claude-cache-monitor --statusline --icon
+#  → 🧠 97.5% · ⏳ 1h 42:15 · 💰 $4.8K · 7d
+
+# Verbose (longer labels; combines with --icon too)
 npx claude-cache-monitor --statusline --verbose
 #  → Cache hit 97.5% · 1h bucket · expires in 42:15 · Cost saved $4.8K · last 7d
+
+npx claude-cache-monitor --statusline --icon --verbose
+#  → 🧠 Cache hit 97.5% · ⏳ Expires 1h 42:15 · 💰 Cost saved $4.8K · last 7d
 
 # Hide the TTL countdown
 npx claude-cache-monitor --statusline --no-timer
@@ -153,6 +160,7 @@ When the hook is installed:
 | `--install-hook` | Install Claude Code PostToolUse hook | - |
 | `--uninstall-hook` | Remove hook | - |
 | `--statusline` | Emit one-line output for Claude Code statusline API | - |
+| `--icon` | (with `--statusline`) use 🧠 / ⏳ / 💰 icons instead of word labels | text |
 | `--verbose` | (with `--statusline`) use longer labels | - |
 | `--no-timer` | (with `--statusline`) hide the TTL countdown | show |
 | `--no-color` | Strip ANSI escape codes | - |

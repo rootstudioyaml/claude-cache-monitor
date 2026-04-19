@@ -55,8 +55,9 @@ function formatTimer(remainingSec) {
  * @param {boolean} [opts.color=true] - emit ANSI escape codes
  * @param {boolean} [opts.verbose=false] - longer layout with labels
  * @param {boolean} [opts.timer=true] - show TTL countdown segment
+ * @param {'text'|'icon'} [opts.mode='text'] - label style. 'icon' uses 🧠 ⏳ 💰 instead of word labels.
  */
-export function formatReport(data, { color = true, verbose = false, timer = true } = {}) {
+export function formatReport(data, { color = true, verbose = false, timer = true, mode = 'text' } = {}) {
   const { summary, ttl, cost, options, lastActivity } = data;
   const { hitRate } = summary;
 
@@ -76,16 +77,32 @@ export function formatReport(data, { color = true, verbose = false, timer = true
   const savings = cost?.savings ?? 0;
 
   const c = (v) => (color ? v : '');
+  const isIcon = mode === 'icon';
 
-  const hitSeg = `${c(BOLD)}Cache hit${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
-  const saveSeg = `${c(CYAN)}Cost saved${c(RESET)} ${formatMoney(savings)}`;
+  // Labels per mode.
+  //   text:       "Cache hit 98.3%"                 |  verbose: "Cache hit 98.3%"
+  //   icon:       "🧠 98.3%"                          |  verbose: "🧠 Cache hit 98.3%"
+  const hitLabel = isIcon
+    ? (verbose ? '🧠 Cache hit' : '🧠')
+    : 'Cache hit';
+  const hitSeg = `${c(BOLD)}${hitLabel}${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
+
+  //   text:       "Cost saved $1.5K"                |  same in verbose
+  //   icon:       "💰 $1.5K"                          |  verbose: "💰 Cost saved $1.5K"
+  const saveLabel = isIcon
+    ? (verbose ? '💰 Cost saved' : '💰')
+    : 'Cost saved';
+  const saveSeg = `${c(CYAN)}${saveLabel}${c(RESET)} ${formatMoney(savings)}`;
+
   const periodSeg = verbose
     ? `${c(GRAY)}last ${options.days}d${c(RESET)}`
     : `${c(GRAY)}${options.days}d${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
-  // Label is "Expires" (natural reading) with the bucket in-line so the
-  // stopwatch reads as "Expires 1h 59:58" (= "1h bucket, 59:58 left").
+  //   text compact:   "Expires 1h 59:58"
+  //   text verbose:   "1h bucket · expires in 59:58"
+  //   icon compact:   "⏳ 1h 59:58"
+  //   icon verbose:   "⏳ Expires 1h 59:58"
   let ttlSeg;
   if (timer && lastActivity) {
     const elapsed = (Date.now() - lastActivity) / 1000;
@@ -97,13 +114,24 @@ export function formatReport(data, { color = true, verbose = false, timer = true
       pct > 0.30 ? GREEN :
       pct > 0.10 ? YELLOW :
       RED;
-    ttlSeg = verbose
-      ? `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`
-      : `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+
+    if (isIcon) {
+      const prefix = verbose ? '⏳ Expires ' : '⏳ ';
+      ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+    } else if (verbose) {
+      ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`;
+    } else {
+      ttlSeg = `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+    }
   } else {
-    ttlSeg = verbose
-      ? `${c(bucketColor)}${bucketLabel} bucket${c(RESET)}`
-      : `${c(bucketColor)}Bucket ${bucketLabel}${c(RESET)}`;
+    if (isIcon) {
+      const prefix = verbose ? '⏳ Bucket ' : '⏳ ';
+      ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)}`;
+    } else if (verbose) {
+      ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)}`;
+    } else {
+      ttlSeg = `${c(bucketColor)}Bucket ${bucketLabel}${c(RESET)}`;
+    }
   }
 
   return [hitSeg, ttlSeg, saveSeg, periodSeg].join(' · ');
