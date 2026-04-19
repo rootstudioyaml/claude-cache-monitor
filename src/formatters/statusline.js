@@ -69,8 +69,8 @@ export function formatReport(data, { color = true, verbose = false, timer = true
   // TTL dominance → color signal (1h = good, 5m = warning).
   // The subscription plan fixes this, so the bucket rarely changes — it's the countdown that matters.
   const is1h = ttl.pct1h >= 0.5;
-  const ttlLabel = is1h ? '1h' : '5m';
-  const ttlColor = is1h ? GREEN : YELLOW;
+  const bucketLabel = is1h ? '1h' : '5m';
+  const bucketColor = is1h ? GREEN : YELLOW;
   const ttlSeconds = is1h ? 3600 : 300;
 
   const savings = cost?.savings ?? 0;
@@ -78,34 +78,33 @@ export function formatReport(data, { color = true, verbose = false, timer = true
   const c = (v) => (color ? v : '');
 
   const hitSeg = `${c(BOLD)}🧠${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
-  const ttlSeg = verbose
-    ? `${c(ttlColor)}${ttlLabel} TTL${c(RESET)}`
-    : `${c(ttlColor)}${ttlLabel}${c(RESET)}`;
   const saveSeg = verbose
     ? `${c(CYAN)}💰${c(RESET)} ${formatMoney(savings)} saved`
     : `${c(CYAN)}💰${c(RESET)} ${formatMoney(savings)}`;
   const periodSeg = `${c(GRAY)}${options.days}d${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
-  let timerSeg = '';
+  // When a countdown exists we absorb the bucket label into it ("TTL 1h 59:58")
+  // so the stopwatch reads as "cache expires in MM:SS" instead of a loose emoji.
+  let ttlSeg;
   if (timer && lastActivity) {
     const elapsed = (Date.now() - lastActivity) / 1000;
     const remaining = ttlSeconds - elapsed;
     const text = formatTimer(remaining);
-    // Color by fraction of TTL remaining.
     const pct = remaining / ttlSeconds;
     const timerColor =
       remaining <= 0 ? RED :
       pct > 0.30 ? GREEN :
       pct > 0.10 ? YELLOW :
       RED;
-    timerSeg = verbose
-      ? `${c(timerColor)}⏱ ${text} left${c(RESET)}`
-      : `${c(timerColor)}⏱ ${text}${c(RESET)}`;
+    ttlSeg = verbose
+      ? `${c(bucketColor)}${bucketLabel} TTL${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`
+      : `${c(bucketColor)}TTL ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+  } else {
+    ttlSeg = verbose
+      ? `${c(bucketColor)}${bucketLabel} TTL${c(RESET)}`
+      : `${c(bucketColor)}TTL ${bucketLabel}${c(RESET)}`;
   }
 
-  const segs = [hitSeg, ttlSeg];
-  if (timerSeg) segs.push(timerSeg);
-  segs.push(saveSeg, periodSeg);
-  return segs.join(' · ');
+  return [hitSeg, ttlSeg, saveSeg, periodSeg].join(' · ');
 }
