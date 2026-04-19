@@ -74,21 +74,49 @@ This enables the "5-minute rule" in practice: a quick dummy question before the 
 
 ### Enable in Claude Code
 
-Add to `~/.claude/settings.json`:
+The Claude Code statusline is event-driven — it only re-renders on assistant messages / mode changes. To keep the countdown ticking while you're idle, set `refreshInterval: 1` alongside the `statusLine` command.
+
+#### macOS / Linux / WSL
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "npx claude-cache-monitor --statusline"
+    "command": "claude-cache-monitor --statusline --icon",
+    "refreshInterval": 1
   }
 }
 ```
 
-Claude Code calls this every ~300ms and displays the output in the statusline bar. Colors are emitted when the terminal supports them:
+Or combine with an existing statusline script — see [`examples/statusline-command.sh`](examples/statusline-command.sh) for a drop-in that prints `user@host:cwd | <cache monitor>`.
+
+#### Windows (native PowerShell, not WSL)
+
+Use the PowerShell example in [`examples/statusline-command.ps1`](examples/statusline-command.ps1):
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File %USERPROFILE%\\.claude\\statusline-command.ps1",
+    "refreshInterval": 1
+  }
+}
+```
+
+Works best in **Windows Terminal** or **PowerShell 7+** (ANSI color + emoji). Classic `conhost cmd` may garble emoji — prefer `--no-icon`-style plain text or use Windows Terminal.
+
+#### Windows (WSL)
+
+Same as Linux — install the package in your WSL Node.js and point to the POSIX sh script.
+
+---
+
+Claude Code calls this every ~300ms on events, plus once per `refreshInterval` second while idle. Colors are emitted when the terminal supports them:
 
 - **Hit rate** — 🟢 ≥85% · 🟡 70–85% · 🔴 <70%
-- **TTL** — 🟢 1h (good) · 🟡 5m (warning)
+- **TTL bucket** — 🟢 1h (good) · 🟡 5m (warning)
+- **Countdown** — 🟢 >30% remaining · 🟡 10–30% · 🔴 <10% or EXPIRED
 
 Statusline mode uses the last 7 days by default (override with `--days N`) and never emits multi-line errors, so your statusline stays clean even when there's no session data yet.
 

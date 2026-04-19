@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 
 const CLAUDE_DIR = join(homedir(), '.claude', 'projects');
@@ -85,6 +85,38 @@ export async function parseSessionFile(filePath) {
 }
 
 /**
+ * Find the most recent user-message timestamp in a session JSONL.
+ * Used for statusline mode so the agent's own tool calls don't reset the TTL
+ * countdown — only the user's actual prompts (type === "user") do.
+ *
+ * @param {string} filePath absolute path to the session JSONL
+ * @returns {Promise<Date|null>}
+ */
+export async function getLastUserMessageTime(filePath) {
+  let lastUserTs = null;
+  try {
+    const rl = createInterface({
+      input: createReadStream(filePath, { encoding: 'utf8' }),
+      crlfDelay: Infinity,
+    });
+    for await (const line of rl) {
+      if (!line) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (entry.type === 'user' && entry.timestamp) {
+          lastUserTs = entry.timestamp;
+        }
+      } catch {
+        // ignore malformed lines
+      }
+    }
+  } catch {
+    return null;
+  }
+  return lastUserTs ? new Date(lastUserTs) : null;
+}
+
+/**
  * Discover all session JSONL files under ~/.claude/projects/
  */
 export async function discoverSessionFiles(options = {}) {
@@ -92,8 +124,9 @@ export async function discoverSessionFiles(options = {}) {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   const files = [];
   // Resolve the excluded session to an absolute path so equality checks are exact.
+  // Use path.isAbsolute() so Windows paths like C:\... are recognized too.
   const excludeAbs = excludeSessionPath
-    ? (excludeSessionPath.startsWith('/') ? excludeSessionPath : join(process.cwd(), excludeSessionPath))
+    ? (isAbsolute(excludeSessionPath) ? excludeSessionPath : join(process.cwd(), excludeSessionPath))
     : null;
 
   let projectDirs;

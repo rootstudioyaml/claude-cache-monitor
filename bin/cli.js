@@ -22,7 +22,7 @@
  *                                               # (or set CACHE_MONITOR_EXCLUDE_SESSION env var)
  */
 
-import { parseAllSessions } from '../src/parser.js';
+import { parseAllSessions, getLastUserMessageTime } from '../src/parser.js';
 import { dailyTrend, ttlBreakdown, detectAnomalies, summary } from '../src/stats.js';
 import { estimateCost } from '../src/cost.js';
 
@@ -107,10 +107,26 @@ async function main() {
   const anomalies = detectAnomalies(trend);
   const cost = estimateCost(sum, sessions[0]?.model);
 
-  // Last API activity across all sessions — feeds the statusline TTL countdown.
-  const lastActivity = sessions
+  // Last API activity feeds the statusline TTL countdown.
+  // For every session that wasn't excluded, take the full endTime (any API call
+  // keeps the prefix cache warm — it doesn't matter whether it's user- or
+  // agent-driven because the cache is shared across sessions by prefix content).
+  const otherLastActivity = sessions
     .map((s) => (s.endTime ? s.endTime.getTime() : 0))
     .reduce((a, b) => Math.max(a, b), 0);
+  // For the excluded (current) session, only the user's prompts count — the
+  // agent's tool calls would otherwise reset the countdown every few seconds
+  // as long as Claude Code is streaming a response.
+  let currentSessionLastUser = 0;
+  if (excludeSessionPath) {
+    try {
+      const t = await getLastUserMessageTime(excludeSessionPath);
+      if (t) currentSessionLastUser = t.getTime();
+    } catch {
+      // ignore — keep 0 so it doesn't raise the max
+    }
+  }
+  const lastActivity = Math.max(otherLastActivity, currentSessionLastUser);
 
   const data = { summary: sum, trend, ttl, anomalies, cost, options: { days }, lastActivity };
 

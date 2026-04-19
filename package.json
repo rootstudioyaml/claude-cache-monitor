@@ -1,6 +1,6 @@
 {
   "name": "claude-cache-monitor",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Monitor prompt cache hit rates for Claude Code sessions (with statusline + TTL countdown)",
   "type": "module",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "bin/",
     "src/",
+    "examples/",
     "README.md"
   ],
   "engines": {
