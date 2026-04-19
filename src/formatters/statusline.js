@@ -99,29 +99,51 @@ export function formatReport(data, { color = true, verbose = false, timer = true
     : `${c(GRAY)}${options.days}d${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
-  //   text compact:   "Expires 1h 59:58"
-  //   text verbose:   "1h bucket · expires in 59:58"
-  //   icon compact:   "⏳ 1h 59:58"
-  //   icon verbose:   "⏳ Expires 1h 59:58"
+  // While the user is chatting with Claude Code, each prompt resets lastActivity,
+  // so the countdown looks frozen near the bucket max ("59:59"). To make the
+  // difference between "actively typing" and "walked away" visible, we show an
+  // `active` marker while lastActivity is within ACTIVE_WINDOW seconds and only
+  // start the visible countdown after that.
+  //   text compact:   "Expires 1h 59:58"  |  "Expires 1h · active"
+  //   text verbose:   "1h bucket · expires in 59:58"  |  "1h bucket · active (cache warm)"
+  //   icon compact:   "⏳ 1h 59:58"  |  "⏳ 1h · active"
+  //   icon verbose:   "⏳ Expires 1h 59:58"  |  "⏳ 1h · active"
+  const ACTIVE_WINDOW = 30; // seconds since lastActivity that still counts as "active"
   let ttlSeg;
   if (timer && lastActivity) {
     const elapsed = (Date.now() - lastActivity) / 1000;
     const remaining = ttlSeconds - elapsed;
-    const text = formatTimer(remaining);
-    const pct = remaining / ttlSeconds;
-    const timerColor =
-      remaining <= 0 ? RED :
-      pct > 0.30 ? GREEN :
-      pct > 0.10 ? YELLOW :
-      RED;
+    const isActive = elapsed >= 0 && elapsed < ACTIVE_WINDOW;
 
-    if (isIcon) {
-      const prefix = verbose ? '⏳ Expires ' : '⏳ ';
-      ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
-    } else if (verbose) {
-      ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`;
+    if (isActive) {
+      // Cache is freshly warm — every new prompt resets the TTL, so a ticking
+      // countdown would be misleading. Surface the "warm" state instead.
+      const activeColor = GREEN;
+      if (isIcon) {
+        const prefix = verbose ? '⏳ Expires ' : '⏳ ';
+        ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)} · ${c(activeColor)}active${c(RESET)}`;
+      } else if (verbose) {
+        ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(activeColor)}active (cache warm)${c(RESET)}`;
+      } else {
+        ttlSeg = `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} · ${c(activeColor)}active${c(RESET)}`;
+      }
     } else {
-      ttlSeg = `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+      const text = formatTimer(remaining);
+      const pct = remaining / ttlSeconds;
+      const timerColor =
+        remaining <= 0 ? RED :
+        pct > 0.30 ? GREEN :
+        pct > 0.10 ? YELLOW :
+        RED;
+
+      if (isIcon) {
+        const prefix = verbose ? '⏳ Expires ' : '⏳ ';
+        ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+      } else if (verbose) {
+        ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`;
+      } else {
+        ttlSeg = `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+      }
     }
   } else {
     if (isIcon) {
