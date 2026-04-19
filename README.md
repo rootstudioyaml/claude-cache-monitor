@@ -40,11 +40,11 @@ Claude Code 내장 statusline에 한 줄로 상시 표시. 커맨드 수동 실�
 ```bash
 # Preview (prints one line)
 npx claude-cache-monitor --statusline
-#  → 🧠 97.5% · TTL 1h 42:15 · 💰 $4.8K · 7d
+#  → Cache 97.5% · TTL 1h 42:15 · Saved $4.8K · 7d
 
 # Verbose (longer labels)
 npx claude-cache-monitor --statusline --verbose
-#  → 🧠 97.5% · 1h TTL · expires in 42:15 · 💰 $4.8K saved · 7d
+#  → Cache hit 97.5% · 1h TTL · expires in 42:15 · Saved $4.8K · last 7d
 
 # Hide the TTL countdown
 npx claude-cache-monitor --statusline --no-timer

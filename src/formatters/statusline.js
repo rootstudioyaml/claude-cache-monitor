@@ -77,11 +77,15 @@ export function formatReport(data, { color = true, verbose = false, timer = true
 
   const c = (v) => (color ? v : '');
 
-  const hitSeg = `${c(BOLD)}🧠${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
+  const hitSeg = verbose
+    ? `${c(BOLD)}Cache hit${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`
+    : `${c(BOLD)}Cache${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
   const saveSeg = verbose
-    ? `${c(CYAN)}💰${c(RESET)} ${formatMoney(savings)} saved`
-    : `${c(CYAN)}💰${c(RESET)} ${formatMoney(savings)}`;
-  const periodSeg = `${c(GRAY)}${options.days}d${c(RESET)}`;
+    ? `${c(CYAN)}Saved${c(RESET)} ${formatMoney(savings)}`
+    : `${c(CYAN)}Saved${c(RESET)} ${formatMoney(savings)}`;
+  const periodSeg = verbose
+    ? `${c(GRAY)}last ${options.days}d${c(RESET)}`
+    : `${c(GRAY)}${options.days}d${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
   // When a countdown exists we absorb the bucket label into it ("TTL 1h 59:58")
