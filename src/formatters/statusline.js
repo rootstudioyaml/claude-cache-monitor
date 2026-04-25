@@ -12,7 +12,7 @@
  *   {
  *     "statusLine": {
  *       "type": "command",
- *       "command": "npx claude-cache-monitor --statusline"
+ *       "command": "npx claude-token-saver --statusline"
  *     }
  *   }
  */

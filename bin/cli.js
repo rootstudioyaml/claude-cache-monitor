@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * claude-cache-monitor CLI
+ * claude-token-saver CLI (formerly claude-cache-monitor)
  *
  * Usage:
- *   npx claude-cache-monitor                    # default report (last 30 days)
- *   npx claude-cache-monitor --days 7           # last 7 days
- *   npx claude-cache-monitor --format json      # JSON output
- *   npx claude-cache-monitor --format csv       # CSV output
- *   npx claude-cache-monitor --project myproj   # filter by project
- *   npx claude-cache-monitor --install-hook     # install PostToolUse hook
- *   npx claude-cache-monitor --uninstall-hook   # remove hook
- *   npx claude-cache-monitor --hook-run         # internal: called by hook
- *   npx claude-cache-monitor --statusline       # one-line output for Claude Code statusline API
- *   npx claude-cache-monitor --statusline --verbose  # longer labels
- *   npx claude-cache-monitor --statusline --no-color # strip ANSI colors
- *   npx claude-cache-monitor --statusline --icon     # use 🧠 ⏳ 💰 icons
- *   npx claude-cache-monitor --statusline --no-timer # hide the TTL countdown
- *   npx claude-cache-monitor --statusline --exclude-session <path>
+ *   npx claude-token-saver                    # default report (last 30 days)
+ *   npx claude-token-saver --days 7           # last 7 days
+ *   npx claude-token-saver --format json      # JSON output
+ *   npx claude-token-saver --format csv       # CSV output
+ *   npx claude-token-saver --project myproj   # filter by project
+ *   npx claude-token-saver --install-hook     # install PostToolUse hook
+ *   npx claude-token-saver --uninstall-hook   # remove hook
+ *   npx claude-token-saver --hook-run         # internal: called by hook
+ *   npx claude-token-saver --statusline       # one-line output for Claude Code statusline API
+ *   npx claude-token-saver --statusline --verbose  # longer labels
+ *   npx claude-token-saver --statusline --no-color # strip ANSI colors
+ *   npx claude-token-saver --statusline --icon     # use 🧠 ⏳ 💰 icons
+ *   npx claude-token-saver --statusline --no-timer # hide the TTL countdown
+ *   npx claude-token-saver --statusline --exclude-session <path>
  *                                               # exclude a JSONL path from lastActivity
  *                                               # (or set CACHE_MONITOR_EXCLUDE_SESSION env var)
  */

@@ -1,4 +1,6 @@
-# claude-cache-monitor
+# claude-token-saver
+
+> **Renamed from `claude-cache-monitor` in v2.0.** The old name still works — `npm i claude-cache-monitor` now redirects here, and the `claude-cache-monitor` binary remains available as an alias. See [migration notes](#migration-from-claude-cache-monitor).
 
 > 📺 **HNPulse Shorts** — 이 도구가 만들어진 배경 (캐시 TTL 1h→5m 변경 이슈):
 > **[▶ Watch the Short](https://www.youtube.com/shorts/oSx2sg935nI)** · [All HNPulse Shorts](https://www.youtube.com/@HNPulseKR/shorts)
@@ -29,21 +31,21 @@ v1.5 신규:
 
 ```bash
 # Run instantly (no install required)
-npx claude-cache-monitor
+npx claude-token-saver
 
 # Last 7 days only
-npx claude-cache-monitor --days 7
+npx claude-token-saver --days 7
 
 # JSON output (for pipelines)
-npx claude-cache-monitor --format json
+npx claude-token-saver --format json
 
 # CSV output (for spreadsheets)
-npx claude-cache-monitor --format csv
+npx claude-token-saver --format csv
 ```
 
 ## Spike Diagnosis (new in v1.5.0)
 
-When you run `npx claude-cache-monitor`, sessions from the last 24 hours whose total input tokens are **≥ 3× your p95 baseline** (or whose single-request context exceeds 250k, indicating 1M context) appear at the top of the report with root causes and remediation commands. Example output:
+When you run `npx claude-token-saver`, sessions from the last 24 hours whose total input tokens are **≥ 3× your p95 baseline** (or whose single-request context exceeds 250k, indicating 1M context) appear at the top of the report with root causes and remediation commands. Example output:
 
 ```
   ⚠ 토큰 급증 감지
@@ -88,28 +90,28 @@ Claude Code 내장 statusline에 한 줄로 상시 표시. 커맨드 수동 실�
 
 ```bash
 # Preview (prints one line — text mode, default)
-npx claude-cache-monitor --statusline
+npx claude-token-saver --statusline
 #  → Cache hit 97.5% · Expires 1h 42:15 · Cost saved $4.8K · Ctx 200k · 7d
 
 # When 1M context is silently on and a session is spiking:
 #  → Cache hit 88.0% · Expires 1h 42:15 · Cost saved $4.8K · Ctx 1M · ⚠ 1M컨텍스트 · 7d
 
 # Icon mode (🧠 / ⏳ / 💰 / 📦)
-npx claude-cache-monitor --statusline --icon
+npx claude-token-saver --statusline --icon
 #  → 🧠 97.5% · ⏳ 1h 42:15 · 💰 $4.8K · 📦 200k · 7d
 
 # Verbose (longer labels; combines with --icon too)
-npx claude-cache-monitor --statusline --verbose
+npx claude-token-saver --statusline --verbose
 #  → Cache hit 97.5% · 1h bucket · expires in 42:15 · Cost saved $4.8K · last 7d
 
-npx claude-cache-monitor --statusline --icon --verbose
+npx claude-token-saver --statusline --icon --verbose
 #  → 🧠 Cache hit 97.5% · ⏳ Expires 1h 42:15 · 💰 Cost saved $4.8K · last 7d
 
 # Hide the TTL countdown
-npx claude-cache-monitor --statusline --no-timer
+npx claude-token-saver --statusline --no-timer
 
 # No ANSI color (plain text)
-npx claude-cache-monitor --statusline --no-color
+npx claude-token-saver --statusline --no-color
 ```
 
 ### TTL countdown (v1.2.1+)
@@ -134,7 +136,7 @@ The Claude Code statusline is event-driven — it only re-renders on assistant m
 {
   "statusLine": {
     "type": "command",
-    "command": "claude-cache-monitor --statusline --icon",
+    "command": "claude-token-saver --statusline --icon",
     "refreshInterval": 1
   }
 }
@@ -196,13 +198,13 @@ Automatically logs cache stats on every tool call and alerts when hit rate drops
 
 ```bash
 # Install hook (default threshold 70%)
-npx claude-cache-monitor --install-hook
+npx claude-token-saver --install-hook
 
 # Custom threshold
-npx claude-cache-monitor --install-hook --threshold 0.8
+npx claude-token-saver --install-hook --threshold 0.8
 
 # Remove hook
-npx claude-cache-monitor --uninstall-hook
+npx claude-token-saver --uninstall-hook
 ```
 
 When the hook is installed:
@@ -317,6 +319,26 @@ Zero dependencies.
 - [GitHub Issue #46829](https://github.com/anthropics/claude-code/issues/46829): Cache TTL regression analysis
 - [HN Discussion](https://news.ycombinator.com/item?id=47736476): Community reaction (168 points, 142 comments)
 - [HNPulse KR](https://www.youtube.com/@HNPulseKR): Hacker News tech deep-dives in Korean ([Shorts](https://www.youtube.com/@HNPulseKR/shorts))
+
+## Migration from claude-cache-monitor
+
+v2.0 renamed the package to reflect the expanded scope (spike diagnosis + 1M-context detection + remediation, not just cache monitoring). **No action required** in most cases:
+
+- `npm i claude-cache-monitor` still installs — the old package is deprecated and redirects here.
+- The binary `claude-cache-monitor` still works alongside the new `claude-token-saver` (both map to the same entry point).
+- Your existing `statusLine.command` setting in `~/.claude/settings.json` keeps working.
+
+If you want to update:
+
+```bash
+npm uninstall -g claude-cache-monitor
+npm i -g claude-token-saver
+
+# then in ~/.claude/settings.json, change:
+#   "command": "claude-cache-monitor --statusline --icon"
+# to:
+#   "command": "claude-token-saver --statusline --icon"
+```
 
 ## License
 

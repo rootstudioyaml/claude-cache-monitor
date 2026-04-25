@@ -1,9 +1,9 @@
 # Claude Code statusline (Windows PowerShell version)
 # Mirrors the POSIX sh script — prints "user@host:cwd" then appends
-# claude-cache-monitor output as a second segment.
+# claude-token-saver output as a second segment.
 #
 # Install:
-#   1) npm install -g claude-cache-monitor
+#   1) npm install -g claude-token-saver
 #   2) Save this file as: %USERPROFILE%\.claude\statusline-command.ps1
 #   3) In %USERPROFILE%\.claude\settings.json add:
 #      {
@@ -30,14 +30,14 @@ Write-Host -NoNewline "$esc[01;32m$env:USERNAME@$env:COMPUTERNAME$esc[00m`:$esc[
 # 2) cache monitor (appended). Separator " | ". Falls back silently.
 Write-Host -NoNewline " $esc[90m|$esc[00m "
 
-$cacheMonitor = Get-Command claude-cache-monitor -ErrorAction SilentlyContinue
+$cacheMonitor = Get-Command claude-token-saver -ErrorAction SilentlyContinue
 if ($cacheMonitor) {
   try {
-    & claude-cache-monitor --statusline --icon 2>$null
+    & claude-token-saver --statusline --icon 2>$null
   } catch { }
 } else {
   # fallback: npx (first run downloads the package; subsequent runs are warm)
   try {
-    & npx --yes claude-cache-monitor@latest --statusline --icon 2>$null
+    & npx --yes claude-token-saver@latest --statusline --icon 2>$null
   } catch { }
 }

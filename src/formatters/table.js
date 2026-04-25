@@ -129,7 +129,7 @@ export function formatReport({ summary: sum, trend, ttl, anomalies, cost, option
   // Header
   lines.push('');
   lines.push(`  Claude 토큰 아껴쓰기 — Last ${options.days} days`);
-  lines.push(`  (claude-cache-monitor v${options.version || ''})`.trimEnd());
+  lines.push(`  (claude-token-saver v${options.version || ''})`.trimEnd());
   lines.push(`  ${'═'.repeat(50)}`);
   lines.push('');
 
