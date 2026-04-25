@@ -1,6 +1,6 @@
 # claude-token-saver
 
-> **Renamed from `claude-cache-monitor` in v2.0.** The old name still works — `npm i claude-cache-monitor` now redirects here, and the `claude-cache-monitor` binary remains available as an alias. See [migration notes](#migration-from-claude-cache-monitor).
+> **Renamed from `claude-cache-monitor` in v2.0.** The old npm package is deprecated and points here. The `claude-cache-monitor` binary is gone — use `claude-token-saver` instead. See [migration notes](#migration-from-claude-cache-monitor).
 
 > 📺 **HNPulse Shorts** — 이 도구가 만들어진 배경 (캐시 TTL 1h→5m 변경 이슈):
 > **[▶ Watch the Short](https://www.youtube.com/shorts/oSx2sg935nI)** · [All HNPulse Shorts](https://www.youtube.com/@HNPulseKR/shorts)
@@ -46,6 +46,12 @@ npx claude-token-saver --format json
 # CSV output (for spreadsheets)
 npx claude-token-saver --format csv
 ```
+
+> **Upgrading from `claude-cache-monitor`?** Uninstall the old package first, then install the new one and update your settings command name:
+> ```bash
+> npm uninstall -g claude-cache-monitor && npm i -g claude-token-saver
+> ```
+> After upgrading, change any `claude-cache-monitor …` invocations (including `statusLine.command` in `~/.claude/settings.json`) to `claude-token-saver …`. See [Migration](#migration-from-claude-cache-monitor).
 
 ## Spike Diagnosis (new in v1.5.0)
 
@@ -342,23 +348,51 @@ Zero dependencies.
 
 ## Migration from claude-cache-monitor
 
-v2.0 renamed the package to reflect the expanded scope (spike diagnosis + 1M-context detection + remediation, not just cache monitoring). **No action required** in most cases:
+v2.0 renamed the package to reflect the expanded scope (spike diagnosis + 1M-context detection + remediation, not just cache monitoring).
 
-- `npm i claude-cache-monitor` still installs — the old package is deprecated and redirects here.
-- The binary `claude-cache-monitor` still works alongside the new `claude-token-saver` (both map to the same entry point).
-- Your existing `statusLine.command` setting in `~/.claude/settings.json` keeps working.
-
-If you want to update:
+### New users
 
 ```bash
-npm uninstall -g claude-cache-monitor
 npm i -g claude-token-saver
-
-# then in ~/.claude/settings.json, change:
-#   "command": "claude-cache-monitor --statusline --icon"
-# to:
-#   "command": "claude-token-saver --statusline --icon"
+# or, no install:
+npx claude-token-saver
 ```
+
+Skip the rest of this section.
+
+### Upgrading from `claude-cache-monitor` v1.x
+
+Two steps:
+
+```bash
+# 1. Remove the old package (its claude-cache-monitor bin is now obsolete).
+npm uninstall -g claude-cache-monitor
+
+# 2. Install the new one.
+npm i -g claude-token-saver
+```
+
+Then update any `claude-cache-monitor …` references. The main one is `statusLine.command` in `~/.claude/settings.json`:
+
+```jsonc
+// before
+"command": "claude-cache-monitor --statusline --icon"
+
+// after
+"command": "claude-token-saver --statusline --icon"
+```
+
+### Why we dropped the `claude-cache-monitor` bin alias
+
+Earlier v2.0 releases shipped a `claude-cache-monitor` bin alongside `claude-token-saver` so existing settings would keep working without edits. In practice this caused an `EEXIST: file already exists` error on `npm i -g claude-token-saver` when v1.x was still installed — and that collision forced the uninstall step anyway. Dropping the alias makes the upgrade path a clean two-liner and lets `npm i -g claude-token-saver` succeed directly if you've never installed the old one.
+
+### Zero-install (npx)
+
+```bash
+npx claude-token-saver@latest --statusline --icon
+```
+
+No uninstall needed; npm just fetches the new name.
 
 ## License
 
