@@ -16,6 +16,8 @@ v1.5 adds three things on top of the original cache monitor:
 
 The original functionality still works: cache hit rate, TTL breakdown, cost impact vs. no-cache, TTL countdown timer, and Claude Code statusline integration.
 
+**Runs standalone or as a plugin under another statusline.** Use `npx claude-token-saver` as a one-shot report, wire it into Claude Code's native statusline as the sole segment, or drop it in as an appended segment under a richer statusline like [rz1989s/claude-code-statusline](https://github.com/rz1989s/claude-code-statusline). See [Three Ways to Use It](#three-ways-to-use-it).
+
 ---
 
 **Claude Code 토큰 아껴쓰기 도구.** 평소보다 10배 토큰을 태운 세션을 찾고, *왜 튀었는지* 진단하고, 붙여넣을 수 있는 한 줄 해결책까지 내줍니다.
@@ -26,6 +28,8 @@ v1.5 신규:
 - **실행 가능한 권장 액션** — macOS/Linux/WSL는 `~/.zshrc`, Windows는 `setx` 명령. [`/model`로 200k 선택해도 1M에 머무는 알려진 버그](https://github.com/anthropics/claude-code/issues/31640)에 대한 경고 포함.
 
 기존 기능(캐시 히트율·TTL 분포·비용 절감·TTL 카운트다운·statusline)은 그대로 유지됩니다.
+
+**단독 도구로도, 다른 statusline의 플러그인으로도 동작합니다.** `npx claude-token-saver` 한 줄로 진단 리포트만 보는 것도 가능하고, Claude Code 내장 statusline에 직접 연결해 상시 표시할 수도 있고, [rz1989s/claude-code-statusline](https://github.com/rz1989s/claude-code-statusline) 같은 기존 statusline 아래에 세그먼트로 덧붙일 수도 있습니다. 자세한 용법은 [Three Ways to Use It](#three-ways-to-use-it) 참고.
 
 ## Quick Start
 
@@ -81,6 +85,18 @@ Issue codes detected:
 | `FREQUENT_CACHE_REBUILD` | `cache_creation` > `cache_read` (cache being made, not reused) |
 
 Remediation commands are chosen from `process.platform` — macOS/Linux/WSL get `~/.zshrc` snippets, Windows gets `setx` and the PowerShell equivalent.
+
+## Three Ways to Use It
+
+`claude-token-saver` is primarily a **standalone tool**; the plugin mode is just a convenience for users who already run another statusline.
+
+| Mode | What you run | When to pick this |
+|---|---|---|
+| **1. Standalone CLI report** | `npx claude-token-saver` | One-off diagnosis. Prints the full report (spikes + cache + cost + trend). Zero setup. |
+| **2. Standalone Claude Code statusline** | `claude-token-saver --statusline` wired via `~/.claude/settings.json` | You want the chip (hit rate · TTL countdown · Ctx 200k/1M · spike) visible all the time. The default story. |
+| **3. Plugin under another statusline** | `examples/statusline-with-rz1989s.sh` appends our segment to rz1989s or any wrapper script | You already have a rich statusline (repo info, cost, MCP, prayer times, themes) and want to bolt the token-saver segment on the end. |
+
+Detail for each mode below.
 
 ## Statusline Mode (new in v1.2.0)
 
