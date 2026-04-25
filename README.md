@@ -9,7 +9,7 @@
 
 **Save tokens on Claude Code.** Catch the session that suddenly burned 10× your usual input, figure out *why*, and get a one-line remediation you can paste.
 
-v1.5 adds three things on top of the original cache monitor:
+v1.5 adds three things on top of the original `claude-cache-monitor`:
 - **Spike diagnosis** — detect recent sessions whose input tokens exploded vs. your own baseline, and name the cause (1M context, 5m TTL churn, cache rebuild, chatty output).
 - **1M-context detection** — Opus 4.7+ auto-enables 1M context on Max plans, silently. This tool surfaces it on the statusline as `Ctx 1M` (red) vs. `Ctx 200k` (green), with the OS-specific command to turn it off.
 - **Actionable advice** — OS-aware remediation (`~/.zshrc` vs. `setx`) and the warning for the known `/model` toggle bug ([anthropics/claude-code#31640](https://github.com/anthropics/claude-code/issues/31640)).
@@ -158,7 +158,7 @@ The Claude Code statusline is event-driven — it only re-renders on assistant m
 }
 ```
 
-Or combine with an existing statusline script — see [`examples/statusline-command.sh`](examples/statusline-command.sh) for a drop-in that prints `user@host:cwd | <cache monitor>`.
+Or combine with an existing statusline script — see [`examples/statusline-command.sh`](examples/statusline-command.sh) for a drop-in that prints `user@host:cwd | <token-saver segment>`.
 
 #### Windows (native PowerShell, not WSL)
 
@@ -230,8 +230,12 @@ When the hook is installed:
 ## Output Example
 
 ```
-  Claude Cache Monitor — Last 30 days
+  Claude 토큰 아껴쓰기 — Last 30 days
+  (claude-token-saver v2.0.1)
   ══════════════════════════════════════════════════
+
+  Context window: 200k  ✓ 200k 컨텍스트 (표준)
+  (최근 단일 요청 최대 83k 토큰)
 
   Summary
   Sessions: 380  |  API calls: 10,813  |  Model: claude-opus-new
