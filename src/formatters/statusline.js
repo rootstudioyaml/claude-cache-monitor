@@ -87,25 +87,31 @@ export function formatReport(data, { color = true, verbose = false, timer = true
     : 'Cache hit';
   const hitSeg = `${c(BOLD)}${hitLabel}${c(RESET)} ${c(hitColor)}${formatPct(hitRate)}${c(RESET)}`;
 
-  //   text:       "Cost saved $1.5K"                |  same in verbose
-  //   icon:       "💰 $1.5K"                          |  verbose: "💰 Cost saved $1.5K"
+  //   text:       "Cache saved $1.5K"                |  same in verbose
+  //   icon:       "💰 $1.5K"                          |  verbose: "💰 Cache saved $1.5K"
   const saveLabel = isIcon
-    ? (verbose ? '💰 Cost saved' : '💰')
-    : 'Cost saved';
+    ? (verbose ? '💰 Cache saved' : '💰')
+    : 'Cache saved';
   const saveSeg = `${c(CYAN)}${saveLabel}${c(RESET)} ${formatMoney(savings)}`;
 
+  // Period label honors hour-precision configs (`mode 6h` → "6h", `mode 1d` → "1d").
+  // Fall back to legacy `${days}d` when callers haven't supplied a label.
+  const periodLabel = options.windowLabel || `${options.days}d`;
   const periodSeg = verbose
-    ? `${c(GRAY)}last ${options.days}d${c(RESET)}`
-    : `${c(GRAY)}${options.days}d${c(RESET)}`;
+    ? `${c(GRAY)}last ${periodLabel}${c(RESET)}`
+    : `${c(GRAY)}${periodLabel}${c(RESET)}`;
 
   // TTL countdown — how much time is left on the last API call's cache entry.
   // Matches Anthropic's actual prompt-cache behaviour: each call starts a fresh
   // TTL window, and the next call (hit) within that window resets it. So the
   // countdown visibly ticks down between prompts, and "resets" happens as a
   // jump back toward the bucket max the moment you send another message.
-  //   text compact:   "Expires 1h 59:58"
+  // Compact modes drop the bucket label — it's read as part of the clock
+  // ("1h 59:58" gets parsed as "1 hour 59 minutes 58 seconds"). The bucket
+  // is plan-determined and rarely changes, so verbose mode is where it belongs.
+  //   text compact:   "Expires 59:58"
   //   text verbose:   "1h bucket · expires in 59:58"
-  //   icon compact:   "⏳ 1h 59:58"
+  //   icon compact:   "⏳ 59:58"
   //   icon verbose:   "⏳ Expires 1h 59:58"
   let ttlSeg;
   if (timer && lastActivity) {
@@ -119,22 +125,28 @@ export function formatReport(data, { color = true, verbose = false, timer = true
       pct > 0.10 ? YELLOW :
       RED;
 
-    if (isIcon) {
-      const prefix = verbose ? '⏳ Expires ' : '⏳ ';
-      ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+    if (isIcon && verbose) {
+      // Drop bucket here too — `⏳ Expires 1h 57:20` reads as "1h 57m 20s left"
+      // for the same reason the compact form did. The bucket lives in the
+      // text-verbose layout where the "bucket" word + `·` separator make it
+      // unambiguous.
+      ttlSeg = `${c(timerColor)}⏳ Cache expires ${text}${c(RESET)}`;
+    } else if (isIcon) {
+      ttlSeg = `${c(timerColor)}⏳ ${text}${c(RESET)}`;
     } else if (verbose) {
-      ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`;
+      ttlSeg = `${c(bucketColor)}Cache ${bucketLabel} bucket${c(RESET)} · ${c(timerColor)}expires in ${text}${c(RESET)}`;
     } else {
-      ttlSeg = `${c(bucketColor)}Expires ${bucketLabel}${c(RESET)} ${c(timerColor)}${text}${c(RESET)}`;
+      ttlSeg = `${c(timerColor)}Cache expires ${text}${c(RESET)}`;
     }
   } else {
+    // No-timer fallback: only the bucket is available, so we show just that.
     if (isIcon) {
-      const prefix = verbose ? '⏳ Bucket ' : '⏳ ';
+      const prefix = verbose ? '⏳ Cache bucket ' : '⏳ ';
       ttlSeg = `${c(bucketColor)}${prefix}${bucketLabel}${c(RESET)}`;
     } else if (verbose) {
-      ttlSeg = `${c(bucketColor)}${bucketLabel} bucket${c(RESET)}`;
+      ttlSeg = `${c(bucketColor)}Cache ${bucketLabel} bucket${c(RESET)}`;
     } else {
-      ttlSeg = `${c(bucketColor)}Bucket ${bucketLabel}${c(RESET)}`;
+      ttlSeg = `${c(bucketColor)}Cache bucket ${bucketLabel}${c(RESET)}`;
     }
   }
 
@@ -144,7 +156,9 @@ export function formatReport(data, { color = true, verbose = false, timer = true
   if (contextWindow && contextWindow.size && contextWindow.size !== 'unknown') {
     const label = contextWindow.size === '1M' ? '1M' : '200k';
     const ctxColor = contextWindow.size === '1M' ? RED : GREEN;
-    if (isIcon) {
+    if (isIcon && verbose) {
+      ctxSeg = `${c(ctxColor)}📦 Context ${label}${c(RESET)}`;
+    } else if (isIcon) {
       ctxSeg = `${c(ctxColor)}📦 ${label}${c(RESET)}`;
     } else if (verbose) {
       ctxSeg = `${c(ctxColor)}Context ${label}${c(RESET)}`;
@@ -156,9 +170,12 @@ export function formatReport(data, { color = true, verbose = false, timer = true
   // Spike chip — one word only, keeps the statusline single-line.
   const spikeSeg = spikeChip ? `${c(RED)}${spikeChip}${c(RESET)}` : null;
 
-  const segs = [hitSeg, ttlSeg, saveSeg];
-  if (ctxSeg) segs.push(ctxSeg);
+  // Warning chip leads — a glance at the statusline catches "something's wrong"
+  // before parsing any numbers. Healthy states have no chip and look unchanged.
+  const segs = [];
   if (spikeSeg) segs.push(spikeSeg);
+  segs.push(hitSeg, ttlSeg, saveSeg);
+  if (ctxSeg) segs.push(ctxSeg);
   segs.push(periodSeg);
   return segs.join(' · ');
 }

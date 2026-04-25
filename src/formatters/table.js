@@ -64,11 +64,11 @@ function formatContextSize(n) {
 
 function renderSpikeSection(spikes, contextWindow) {
   const lines = [];
-  lines.push('  ⚠ 토큰 급증 감지');
+  lines.push('  ⚠ Token spike detected');
   lines.push(`  ${'─'.repeat(50)}`);
   if (contextWindow && contextWindow.size === '1M') {
     lines.push(
-      `  컨텍스트 모드 추정: 1M  (최근 단일 요청 최대 ${formatContextSize(contextWindow.maxContext)} 토큰)`,
+      `  Context mode: 1M  (max recent single-request input ${formatContextSize(contextWindow.maxContext)} tokens)`,
     );
     lines.push('');
   }
@@ -77,11 +77,11 @@ function renderSpikeSection(spikes, contextWindow) {
     const ratioLabel = spike.ratio ? `${spike.ratio.toFixed(1)}× p95` : 'single-request > 250k';
     lines.push(
       `  • ${shortSessionId(m.sessionId)} [${m.projectDir || 'unknown'}]  ` +
-        `총 입력 ${formatContextSize(m.totalInput)}  (${ratioLabel}, 요청 ${m.requestCount}회)`,
+        `total input ${formatContextSize(m.totalInput)}  (${ratioLabel}, ${m.requestCount} requests)`,
     );
     if (m.maxContextPerRequest > 0) {
       lines.push(
-        `      단일 요청 최대 컨텍스트: ${formatContextSize(m.maxContextPerRequest)} 토큰`,
+        `      max single-request context: ${formatContextSize(m.maxContextPerRequest)} tokens`,
       );
     }
     for (const issue of spike.issues) {
@@ -104,7 +104,7 @@ function renderSpikeSection(spikes, contextWindow) {
     }
   }
   if (uniqueIssues.length > 0) {
-    lines.push('  권장 액션');
+    lines.push('  Recommended actions');
     lines.push(`  ${'─'.repeat(50)}`);
     for (const issue of uniqueIssues) {
       const info = ISSUE_MESSAGES[issue.code];
@@ -128,7 +128,7 @@ export function formatReport({ summary: sum, trend, ttl, anomalies, cost, option
 
   // Header
   lines.push('');
-  lines.push(`  Claude 토큰 아껴쓰기 — Last ${options.days} days`);
+  lines.push(`  Claude Token Saver — Last ${options.days} day${options.days === 1 ? '' : 's'}`);
   lines.push(`  (claude-token-saver v${options.version || ''})`.trimEnd());
   lines.push(`  ${'═'.repeat(50)}`);
   lines.push('');
@@ -142,10 +142,10 @@ export function formatReport({ summary: sum, trend, ttl, anomalies, cost, option
   if (contextWindow && contextWindow.size !== 'unknown') {
     const note =
       contextWindow.size === '1M'
-        ? '⚠ 1M 컨텍스트 사용 중 (Opus 4.7+ Max 기본값). 필요 없으면 CLAUDE_CODE_DISABLE_1M_CONTEXT=1'
-        : '✓ 200k 컨텍스트 (표준)';
+        ? '⚠ 1M context active (Opus 4.7+ Max default). Disable with CLAUDE_CODE_DISABLE_1M_CONTEXT=1'
+        : '✓ 200k context (standard)';
     lines.push(`  Context window: ${contextWindow.size}  ${note}`);
-    lines.push(`  (최근 단일 요청 최대 ${formatContextSize(contextWindow.maxContext)} 토큰)`);
+    lines.push(`  (max recent single-request input ${formatContextSize(contextWindow.maxContext)} tokens)`);
     lines.push('');
   }
 

@@ -9,6 +9,13 @@
 
 **Save tokens on Claude Code.** Catch the session that suddenly burned 10× your usual input, figure out *why*, and get a one-line remediation you can paste.
 
+**Why I built this.** I'm on the Max plan. On Opus 4.6 I never hit the *current-session* cap. After Opus 4.7 rolled out, I started hitting it on the same workflow — repeatedly. The official token statistics didn't match what I was actually feeling, and Claude Code's UI doesn't show prompt-cache health. This tool is what let me see *why*: low cache hit rate, 5m TTL writes that should have been 1h, 1M context auto-promoted in the background.
+
+v2.1 (2026-04) adds the workflow that follows the diagnosis:
+- **`claude-token-saver install`** — one command writes a Claude Code Skill (auto-activates when you mention "cache hit rate" / "1M context" / etc.) and a `/token-monitor` slash command.
+- **`claude-token-saver history`** — every warning chip transition is auto-logged to a daily Markdown file, so you can answer "when did this start" without grepping logs.
+- **Cross-platform paths** — Windows (`%APPDATA%`), macOS (`~/Library/Application Support`), Linux (`~/.config` / XDG) all handled.
+
 v1.5 adds three things on top of the original `claude-cache-monitor`:
 - **Spike diagnosis** — detect recent sessions whose input tokens exploded vs. your own baseline, and name the cause (1M context, 5m TTL churn, cache rebuild, chatty output).
 - **1M-context detection** — Opus 4.7+ auto-enables 1M context on Max plans, silently. This tool surfaces it on the statusline as `Ctx 1M` (red) vs. `Ctx 200k` (green), with the OS-specific command to turn it off.
@@ -211,6 +218,48 @@ Claude Code calls this every ~300ms on events, plus once per `refreshInterval` s
 - **Spike chip** — appears only when the current session is flagged (e.g. `⚠ 1M컨텍스트`, `⚠ 5m TTL`, `⚠ 캐시미스`, `⚠ 입력폭주`)
 
 Statusline mode uses the last 7 days by default (override with `--days N`) and never emits multi-line errors, so your statusline stays clean even when there's no session data yet.
+
+## Claude Code integration (`install`) — new in v2.1
+
+One command wires up everything else this README mentions:
+
+```bash
+claude-token-saver install
+```
+
+This writes two files under your Claude user dir:
+- `~/.claude/skills/claude-token-saver/SKILL.md` — auto-activates whenever you mention chip wording ("⚠ 1M ON", "cache miss", etc.) or ask about token usage. Claude Code will then know to read history, drill into the table report, and explain the warning.
+- `~/.claude/commands/token-monitor.md` — adds a `/token-monitor` slash command that runs `claude-token-saver history` + a fresh report and summarizes both for you.
+
+Re-run with `--force` to overwrite. Install only one piece with `install --skill` or `install --command`.
+
+## Warning history (`history`) — new in v2.1
+
+The statusline path auto-logs every chip transition (none → ⚠, ⚠ A → ⚠ B, ⚠ → resolved) to a daily Markdown file. Read it back with:
+
+```bash
+claude-token-saver history             # last 7 days
+claude-token-saver history --days 30   # wider window
+claude-token-saver history --list      # just list available dates
+```
+
+Sample output:
+
+```
+# Token Monitor — 2026-04-25
+
+## Events
+- 09:14:02 ⚠ 1M ON  — Context auto-promoted to 1M (max single-request 280k tokens)
+- 09:42:18 ⚠ 1M ON → ⚠ Cache miss  — session abc12345: LOW_HIT_RATE
+- 10:05:47 ✓ resolved (was ⚠ Cache miss)
+```
+
+Storage paths (cross-platform):
+- **Windows**: `%APPDATA%\claude-token-saver\history\YYYY-MM-DD.md`
+- **macOS**: `~/Library/Application Support/claude-token-saver/history/YYYY-MM-DD.md`
+- **Linux**: `$XDG_CONFIG_HOME/claude-token-saver/history/YYYY-MM-DD.md` (or `~/.config/...`)
+
+Each day's file is plain Markdown — open it in any editor. Transitions are deduped, so the 1Hz statusline refresh doesn't spam.
 
 ## Hook Setup
 

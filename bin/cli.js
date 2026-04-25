@@ -62,6 +62,113 @@ function hasFlag(name) {
 }
 
 async function main() {
+  // Subcommand: history — print recent warning transitions captured by the
+  // statusline. One markdown file per day, persisted under the platform-
+  // specific user-data dir.
+  //   claude-token-saver history              # last 7 days
+  //   claude-token-saver history --days 30    # custom window
+  //   claude-token-saver history --list       # just list available dates
+  if (args[0] === 'history') {
+    const { readRecent, listDates, historyDir } = await import('../src/history.js');
+    if (hasFlag('--list')) {
+      const dates = listDates();
+      if (dates.length === 0) {
+        console.log(`No history yet. Files will appear under: ${historyDir()}`);
+        return;
+      }
+      console.log(`History (${historyDir()}):`);
+      for (const d of dates) console.log(`  ${d}`);
+      return;
+    }
+    const days = parseFloat(getArg('--days') || '7');
+    const recent = readRecent(days);
+    if (recent.length === 0) {
+      console.log(`No warning history in the last ${days} day${days === 1 ? '' : 's'}.`);
+      console.log(`(Files would be written to: ${historyDir()})`);
+      return;
+    }
+    for (const { content } of recent) {
+      console.log(content.replace(/\n+$/, ''));
+      console.log('');
+    }
+    return;
+  }
+
+  // Subcommand: install — write the Claude Code Skill and slash command so
+  // /token-monitor and the auto-trigger skill become available without any
+  // manual file editing. Cross-platform (uses node:path + node:fs).
+  //   claude-token-saver install              # install both
+  //   claude-token-saver install --skill      # only the skill
+  //   claude-token-saver install --command    # only the slash command
+  //   claude-token-saver install --force      # overwrite existing files
+  if (args[0] === 'install') {
+    const { installSkill, installCommand, installAll } = await import('../src/installer.js');
+    const force = hasFlag('--force');
+    const onlySkill = hasFlag('--skill');
+    const onlyCommand = hasFlag('--command');
+    const print = (kind, r) => {
+      const verb = r.action === 'exists' ? 'already exists' : r.action;
+      console.log(`  ${kind}: ${r.path} (${verb})`);
+    };
+    if (onlySkill && !onlyCommand) {
+      print('skill', installSkill({ force }));
+    } else if (onlyCommand && !onlySkill) {
+      print('command', installCommand({ force }));
+    } else {
+      const r = installAll({ force });
+      print('skill', r.skill);
+      print('command', r.command);
+    }
+    console.log('');
+    console.log('Open Claude Code in any directory and try:');
+    console.log('  /token-monitor');
+    console.log('Or just mention "cache hit rate" / "1M context" — the skill auto-activates.');
+    if (!force) {
+      console.log('');
+      console.log('Tip: re-run with --force to overwrite existing files.');
+    }
+    return;
+  }
+
+  // Subcommand: mode — persist statusline preferences so future runs pick
+  // them up without flags or wrapper edits.
+  //   claude-token-saver mode                    # show current config
+  //   claude-token-saver mode icon verbose       # set icon + verbose
+  //   claude-token-saver mode reset              # clear back to defaults
+  if (args[0] === 'mode') {
+    const { applyMode, loadConfig, configPath, statuslineDefaults, VALID_KEYWORDS } =
+      await import('../src/config.js');
+    const words = args.slice(1);
+    if (words.length === 0) {
+      const eff = statuslineDefaults();
+      const raw = loadConfig().statusline || {};
+      console.log('Statusline mode (effective):');
+      console.log(`  icon:    ${eff.icon}`);
+      console.log(`  verbose: ${eff.verbose}`);
+      console.log(`  timer:   ${eff.timer}`);
+      console.log(`  color:   ${eff.color}`);
+      console.log(`  window:  ${eff.windowLabel} (${eff.windowHours}h)`);
+      console.log('');
+      console.log(`Stored config (${configPath()}):`);
+      console.log(`  ${Object.keys(raw).length === 0 ? '(none — using defaults)' : JSON.stringify(raw)}`);
+      console.log('');
+      console.log('Change with: claude-token-saver mode <keywords...>');
+      console.log(`Keywords: ${VALID_KEYWORDS.join(', ')}`);
+      return;
+    }
+    const { applied, unknown } = applyMode(words);
+    if (unknown.length) {
+      console.error(`Unknown keyword${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}`);
+      console.error(`Valid: ${VALID_KEYWORDS.join(', ')}`);
+      process.exit(1);
+    }
+    const eff = statuslineDefaults();
+    console.log(`Updated: ${applied.join(', ')}`);
+    console.log(`Now: icon=${eff.icon} verbose=${eff.verbose} timer=${eff.timer} color=${eff.color} window=${eff.windowLabel}`);
+    console.log('Statusline picks up the change on the next refresh (~1s).');
+    return;
+  }
+
   // Hook management
   if (hasFlag('--install-hook')) {
     const { installHook } = await import('../src/hook-manager.js');
@@ -85,10 +192,89 @@ async function main() {
   // Statusline mode shortcut
   const isStatusline = hasFlag('--statusline') || getArg('--format') === 'statusline';
 
+  // Demo mode — render synthetic warning-case data through the real
+  // formatter for screencasts/marketing GIFs. `--demo cycle` rotates through
+  // every scenario based on wall clock so a screen recorder picks them up.
+  const demoArg = getArg('--demo');
+
+  // `claude-token-saver --demo table` (no --statusline) — full table view
+  // with all six issue drill-downs at once, for marketing screencasts.
+  if (!isStatusline && demoArg === 'table') {
+    const { buildTableDemoData } = await import('../src/demo.js');
+    const { formatReport } = await import('../src/formatters/table.js');
+    const data = buildTableDemoData({ version: PKG_VERSION });
+    console.log(formatReport(data));
+    return;
+  }
+
+  if (isStatusline && demoArg) {
+    const { buildScenarioData, listScenarios } = await import('../src/demo.js');
+    const { statuslineDefaults } = await import('../src/config.js');
+    const cfg = statuslineDefaults();
+    const cycleSeconds = parseFloat(getArg('--demo-cycle-sec') || '3');
+    const data = buildScenarioData(demoArg, {
+      cycleSeconds,
+      windowHours: cfg.windowHours,
+      windowLabel: cfg.windowLabel,
+      days: cfg.windowHours / 24,
+      version: PKG_VERSION,
+    });
+    if (!data) {
+      const known = listScenarios().map((s) => s.name).concat(['cycle']).join(', ');
+      console.error(`Unknown demo scenario: ${demoArg}`);
+      console.error(`Valid: ${known}`);
+      process.exit(1);
+    }
+    const { formatReport } = await import('../src/formatters/statusline.js');
+    const isIcon = hasFlag('--icon')
+      ? true
+      : (hasFlag('--no-icon') || hasFlag('--text') ? false : cfg.icon);
+    const isVerbose = hasFlag('--verbose')
+      ? true
+      : (hasFlag('--no-verbose') || hasFlag('--compact') ? false : cfg.verbose);
+    const showTimer = hasFlag('--no-timer') ? false : cfg.timer;
+    const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR && cfg.color;
+    const out = formatReport(data, {
+      color: colorOk,
+      verbose: isVerbose,
+      timer: showTimer,
+      mode: isIcon ? 'icon' : 'text',
+    });
+    // For `cycle` mode, prefix with the scenario label so the screen recorder
+    // shows what the viewer is looking at (only when explicitly requested).
+    if (demoArg === 'cycle' && hasFlag('--demo-label')) {
+      const gray = colorOk ? '\x1b[90m' : '';
+      const reset = colorOk ? '\x1b[0m' : '';
+      console.log(`${gray}[${data._demoLabel}]${reset}  ${out}`);
+    } else {
+      console.log(out);
+    }
+    return;
+  }
+
   // Report generation
-  // Statusline default = 7 days (fast, called every ~300ms). Others = 30 days.
-  const defaultDays = isStatusline ? 7 : 30;
-  const days = parseInt(getArg('--days') || getArg('-d') || String(defaultDays), 10);
+  // Statusline window comes from persisted config — hours-precise so users
+  // can pick `1h` / `6h` etc, not just whole days. Other formats default to
+  // 30 days as before.
+  let windowHours = 30 * 24;
+  let windowLabel = '30d';
+  if (isStatusline) {
+    const { statuslineDefaults } = await import('../src/config.js');
+    const d = statuslineDefaults();
+    windowHours = d.windowHours;
+    windowLabel = d.windowLabel;
+  }
+  // CLI overrides: --hours wins over --days; both win over config.
+  const hoursArg = getArg('--hours');
+  const daysArg = getArg('--days') || getArg('-d');
+  if (hoursArg !== undefined) {
+    windowHours = parseFloat(hoursArg);
+    windowLabel = `${windowHours}h`;
+  } else if (daysArg !== undefined) {
+    windowHours = parseFloat(daysArg) * 24;
+    windowLabel = `${parseFloat(daysArg)}d`;
+  }
+  const days = windowHours / 24;
   const format = isStatusline ? 'statusline' : (getArg('--format') || getArg('-f') || 'table');
   const projectFilter = getArg('--project') || getArg('-p');
 
@@ -136,9 +322,11 @@ async function main() {
   // actionable right now. 1M context is always shown; otherwise only fire
   // if the most recent session actually appears in the spike list.
   let spikeChip = null;
+  let chipDetail = null;
   if (format === 'statusline') {
     if (contextWindow.size === '1M') {
       spikeChip = chipForIssues([], contextWindow);
+      chipDetail = `Context auto-promoted to 1M (max single-request ${Math.round(contextWindow.maxContext / 1000)}k tokens)`;
     } else {
       const recentSession = sessions
         .slice()
@@ -150,7 +338,20 @@ async function main() {
         const m = sessionMetrics(recentSession);
         const issues = diagnoseSession(m, spikeReport.baseline);
         spikeChip = chipForIssues(issues, contextWindow);
+        const titles = issues
+          .map((i) => i.code)
+          .slice(0, 2)
+          .join(', ');
+        chipDetail = `session ${recentSession.sessionId?.slice(0, 8) || ''}: ${titles}`;
       }
+    }
+    // Persist transitions to ~/.config/claude-token-saver/history/YYYY-MM-DD.md
+    // so /token-monitor and `claude-token-saver history` can replay them.
+    try {
+      const { recordChip } = await import('../src/history.js');
+      recordChip(spikeChip, { detail: chipDetail });
+    } catch {
+      // history is non-critical — don't let it break the statusline render
     }
   }
 
@@ -181,7 +382,7 @@ async function main() {
     ttl,
     anomalies,
     cost,
-    options: { days, version: PKG_VERSION },
+    options: { days, windowHours, windowLabel, version: PKG_VERSION },
     lastActivity,
     spikeReport,
     contextWindow,
@@ -197,13 +398,25 @@ async function main() {
     output = formatReport(data);
   } else if (format === 'statusline') {
     const { formatReport } = await import('../src/formatters/statusline.js');
-    const colorOk = !hasFlag('--no-color') && !process.env.NO_COLOR;
-    const mode = hasFlag('--icon') ? 'icon' : 'text';
+    const { statuslineDefaults } = await import('../src/config.js');
+    const cfg = statuslineDefaults();
+
+    // CLI flags take precedence; otherwise fall back to persisted config.
+    const isIcon = hasFlag('--icon')
+      ? true
+      : (hasFlag('--no-icon') || hasFlag('--text') ? false : cfg.icon);
+    const isVerbose = hasFlag('--verbose')
+      ? true
+      : (hasFlag('--no-verbose') || hasFlag('--compact') ? false : cfg.verbose);
+    const showTimer = hasFlag('--no-timer') ? false : cfg.timer;
+    const colorOk =
+      !hasFlag('--no-color') && !process.env.NO_COLOR && cfg.color;
+
     output = formatReport(data, {
       color: colorOk,
-      verbose: hasFlag('--verbose'),
-      timer: !hasFlag('--no-timer'),
-      mode,
+      verbose: isVerbose,
+      timer: showTimer,
+      mode: isIcon ? 'icon' : 'text',
     });
   } else {
     const { formatReport } = await import('../src/formatters/table.js');
