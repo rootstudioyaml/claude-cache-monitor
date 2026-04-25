@@ -58,7 +58,7 @@ function formatTimer(remainingSec) {
  * @param {'text'|'icon'} [opts.mode='text'] - label style. 'icon' uses 🧠 ⏳ 💰 instead of word labels.
  */
 export function formatReport(data, { color = true, verbose = false, timer = true, mode = 'text' } = {}) {
-  const { summary, ttl, cost, options, lastActivity } = data;
+  const { summary, ttl, cost, options, lastActivity, contextWindow, spikeChip } = data;
   const { hitRate } = summary;
 
   // Hit rate → color signal
@@ -138,5 +138,27 @@ export function formatReport(data, { color = true, verbose = false, timer = true
     }
   }
 
-  return [hitSeg, ttlSeg, saveSeg, periodSeg].join(' · ');
+  // Context window chip (e.g. "📦 1M" or "📦 200k"). 1M gets a warning color
+  // because it's the expensive default on Max plans after Opus 4.7.
+  let ctxSeg = null;
+  if (contextWindow && contextWindow.size && contextWindow.size !== 'unknown') {
+    const label = contextWindow.size === '1M' ? '1M' : '200k';
+    const ctxColor = contextWindow.size === '1M' ? RED : GREEN;
+    if (isIcon) {
+      ctxSeg = `${c(ctxColor)}📦 ${label}${c(RESET)}`;
+    } else if (verbose) {
+      ctxSeg = `${c(ctxColor)}Context ${label}${c(RESET)}`;
+    } else {
+      ctxSeg = `${c(ctxColor)}Ctx ${label}${c(RESET)}`;
+    }
+  }
+
+  // Spike chip — one word only, keeps the statusline single-line.
+  const spikeSeg = spikeChip ? `${c(RED)}${spikeChip}${c(RESET)}` : null;
+
+  const segs = [hitSeg, ttlSeg, saveSeg];
+  if (ctxSeg) segs.push(ctxSeg);
+  if (spikeSeg) segs.push(spikeSeg);
+  segs.push(periodSeg);
+  return segs.join(' · ');
 }

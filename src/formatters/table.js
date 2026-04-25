@@ -1,6 +1,7 @@
 /**
  * Terminal table formatter — zero dependencies.
  */
+import { ISSUE_MESSAGES } from '../advice.js';
 
 function pad(str, len, align = 'left') {
   const s = String(str);
@@ -49,14 +50,104 @@ function tableBot(widths) {
 /**
  * Format the full report for terminal output.
  */
-export function formatReport({ summary: sum, trend, ttl, anomalies, cost, options }) {
+function shortSessionId(id) {
+  if (!id) return '(unknown)';
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
+
+function formatContextSize(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + 'k';
+  return String(n);
+}
+
+function renderSpikeSection(spikes, contextWindow) {
+  const lines = [];
+  lines.push('  ⚠ 토큰 급증 감지');
+  lines.push(`  ${'─'.repeat(50)}`);
+  if (contextWindow && contextWindow.size === '1M') {
+    lines.push(
+      `  컨텍스트 모드 추정: 1M  (최근 단일 요청 최대 ${formatContextSize(contextWindow.maxContext)} 토큰)`,
+    );
+    lines.push('');
+  }
+  for (const spike of spikes) {
+    const m = spike.metrics;
+    const ratioLabel = spike.ratio ? `${spike.ratio.toFixed(1)}× p95` : 'single-request > 250k';
+    lines.push(
+      `  • ${shortSessionId(m.sessionId)} [${m.projectDir || 'unknown'}]  ` +
+        `총 입력 ${formatContextSize(m.totalInput)}  (${ratioLabel}, 요청 ${m.requestCount}회)`,
+    );
+    if (m.maxContextPerRequest > 0) {
+      lines.push(
+        `      단일 요청 최대 컨텍스트: ${formatContextSize(m.maxContextPerRequest)} 토큰`,
+      );
+    }
+    for (const issue of spike.issues) {
+      const info = ISSUE_MESSAGES[issue.code];
+      if (!info) continue;
+      lines.push(`      · ${info.title}`);
+    }
+    lines.push('');
+  }
+
+  // De-dupe action blocks — if multiple spikes share the same issue, show
+  // the remediation once per run, not once per spike.
+  const seen = new Set();
+  const uniqueIssues = [];
+  for (const spike of spikes) {
+    for (const issue of spike.issues) {
+      if (seen.has(issue.code)) continue;
+      seen.add(issue.code);
+      uniqueIssues.push(issue);
+    }
+  }
+  if (uniqueIssues.length > 0) {
+    lines.push('  권장 액션');
+    lines.push(`  ${'─'.repeat(50)}`);
+    for (const issue of uniqueIssues) {
+      const info = ISSUE_MESSAGES[issue.code];
+      if (!info) continue;
+      lines.push(`  ▸ ${info.title}`);
+      lines.push(`    ${info.explain}`);
+      for (const action of info.actions()) {
+        lines.push(`    - ${action.label}`);
+        for (const cmd of action.commands) {
+          lines.push(`        ${cmd}`);
+        }
+      }
+      lines.push('');
+    }
+  }
+  return lines;
+}
+
+export function formatReport({ summary: sum, trend, ttl, anomalies, cost, options, spikeReport, contextWindow }) {
   const lines = [];
 
   // Header
   lines.push('');
-  lines.push(`  Claude Cache Monitor — Last ${options.days} days`);
+  lines.push(`  Claude 토큰 아껴쓰기 — Last ${options.days} days`);
+  lines.push(`  (claude-cache-monitor v${options.version || ''})`.trimEnd());
   lines.push(`  ${'═'.repeat(50)}`);
   lines.push('');
+
+  // Spike section goes FIRST — it's what the user acts on.
+  if (spikeReport && spikeReport.spikes.length > 0) {
+    lines.push(...renderSpikeSection(spikeReport.spikes, contextWindow));
+  }
+
+  // Context window chip for the normal case too
+  if (contextWindow && contextWindow.size !== 'unknown') {
+    const note =
+      contextWindow.size === '1M'
+        ? '⚠ 1M 컨텍스트 사용 중 (Opus 4.7+ Max 기본값). 필요 없으면 CLAUDE_CODE_DISABLE_1M_CONTEXT=1'
+        : '✓ 200k 컨텍스트 (표준)';
+    lines.push(`  Context window: ${contextWindow.size}  ${note}`);
+    lines.push(`  (최근 단일 요청 최대 ${formatContextSize(contextWindow.maxContext)} 토큰)`);
+    lines.push('');
+  }
 
   // Overall summary
   lines.push('  Summary');

@@ -22,11 +22,34 @@
  *                                               # (or set CACHE_MONITOR_EXCLUDE_SESSION env var)
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
 import { parseAllSessions, getLastUserMessageTime } from '../src/parser.js';
-import { dailyTrend, ttlBreakdown, detectAnomalies, summary } from '../src/stats.js';
+import {
+  dailyTrend,
+  ttlBreakdown,
+  detectAnomalies,
+  summary,
+  detectSpikes,
+  detectContextWindow,
+  sessionMetrics,
+  diagnoseSession,
+} from '../src/stats.js';
 import { estimateCost } from '../src/cost.js';
+import { chipForIssues } from '../src/advice.js';
 
 const args = process.argv.slice(2);
+
+const PKG_VERSION = (() => {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version || '';
+  } catch {
+    return '';
+  }
+})();
 
 function getArg(name) {
   const idx = args.indexOf(name);
@@ -106,6 +129,30 @@ async function main() {
   const sum = summary(sessions);
   const anomalies = detectAnomalies(trend);
   const cost = estimateCost(sum, sessions[0]?.model);
+  const spikeReport = detectSpikes(sessions, { recentHours: 24, multiplier: 3 });
+  const contextWindow = detectContextWindow(sessions, { recentHours: 24 });
+
+  // For statusline: attach a single-word chip only when there's something
+  // actionable right now. 1M context is always shown; otherwise only fire
+  // if the most recent session actually appears in the spike list.
+  let spikeChip = null;
+  if (format === 'statusline') {
+    if (contextWindow.size === '1M') {
+      spikeChip = chipForIssues([], contextWindow);
+    } else {
+      const recentSession = sessions
+        .slice()
+        .sort((a, b) => (b.endTime?.getTime() || 0) - (a.endTime?.getTime() || 0))[0];
+      const recentIsSpiking = recentSession && spikeReport.spikes.some(
+        (sp) => sp.metrics.sessionId === recentSession.sessionId,
+      );
+      if (recentIsSpiking) {
+        const m = sessionMetrics(recentSession);
+        const issues = diagnoseSession(m, spikeReport.baseline);
+        spikeChip = chipForIssues(issues, contextWindow);
+      }
+    }
+  }
 
   // Last API activity feeds the statusline TTL countdown.
   // For every session that wasn't excluded, take the full endTime (any API call
@@ -128,7 +175,18 @@ async function main() {
   }
   const lastActivity = Math.max(otherLastActivity, currentSessionLastUser);
 
-  const data = { summary: sum, trend, ttl, anomalies, cost, options: { days }, lastActivity };
+  const data = {
+    summary: sum,
+    trend,
+    ttl,
+    anomalies,
+    cost,
+    options: { days, version: PKG_VERSION },
+    lastActivity,
+    spikeReport,
+    contextWindow,
+    spikeChip,
+  };
 
   let output;
   if (format === 'json') {

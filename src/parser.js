@@ -59,6 +59,7 @@ export async function parseSessionFile(filePath) {
   }
 
   const reqs = [...requests.values()];
+  let maxContextPerRequest = 0;
   const totals = reqs.reduce(
     (acc, r) => {
       acc.input += r.inputTokens;
@@ -67,6 +68,8 @@ export async function parseSessionFile(filePath) {
       acc.ephemeral5m += r.ephemeral5mTokens;
       acc.ephemeral1h += r.ephemeral1hTokens;
       acc.output += r.outputTokens;
+      const ctx = r.inputTokens + r.cacheCreationTokens + r.cacheReadTokens;
+      if (ctx > maxContextPerRequest) maxContextPerRequest = ctx;
       return acc;
     },
     { input: 0, cacheCreation: 0, cacheRead: 0, ephemeral5m: 0, ephemeral1h: 0, output: 0 },
@@ -80,6 +83,7 @@ export async function parseSessionFile(filePath) {
     requestCount: reqs.length,
     requests: reqs,
     totals,
+    maxContextPerRequest,
     model: reqs[0]?.model || 'unknown',
   };
 }

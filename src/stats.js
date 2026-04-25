@@ -110,6 +110,214 @@ export function detectAnomalies(trend, { threshold = 0.15 } = {}) {
 }
 
 /**
+ * Per-session metrics used by diagnostics.
+ */
+export function sessionMetrics(session) {
+  const t = session.totals;
+  const totalInput = t.input + t.cacheCreation + t.cacheRead;
+  const reqs = session.requestCount || 0;
+  const avgInputPerReq = reqs > 0 ? totalInput / reqs : 0;
+  const hit = hitRate(t.cacheRead, t.cacheCreation, t.input);
+  const ttlSum = t.ephemeral5m + t.ephemeral1h;
+  const pct5m = ttlSum > 0 ? t.ephemeral5m / ttlSum : 0;
+  const outputRatio = totalInput > 0 ? t.output / totalInput : 0;
+  const writeToReadRatio = t.cacheRead > 0 ? t.cacheCreation / t.cacheRead : (t.cacheCreation > 0 ? Infinity : 0);
+  return {
+    sessionId: session.sessionId,
+    projectDir: session.projectDir,
+    startTime: session.startTime,
+    endTime: session.endTime,
+    requestCount: reqs,
+    totalInput,
+    avgInputPerReq,
+    hitRate: hit,
+    pct5m,
+    outputRatio,
+    writeToReadRatio,
+    maxContextPerRequest: session.maxContextPerRequest || 0,
+    totals: t,
+  };
+}
+
+function median(values) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function percentile(values, p) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+  return sorted[idx];
+}
+
+/**
+ * Baseline using sessions OUTSIDE the recent window. Recent sessions are what
+ * we're diagnosing — if we let them into the baseline they'd drag the baseline
+ * toward themselves and never register as anomalies.
+ */
+export function computeBaseline(sessions, recentWindowMs = 24 * 60 * 60 * 1000) {
+  const cutoff = Date.now() - recentWindowMs;
+  const older = sessions.filter((s) => s.startTime && s.startTime.getTime() < cutoff && s.requestCount > 0);
+  if (older.length < 3) {
+    return { enough: false, sampleSize: older.length };
+  }
+  const metrics = older.map(sessionMetrics);
+  return {
+    enough: true,
+    sampleSize: older.length,
+    medianAvgInputPerReq: median(metrics.map((m) => m.avgInputPerReq)),
+    p95AvgInputPerReq: percentile(metrics.map((m) => m.avgInputPerReq), 0.95),
+    medianTotalInput: median(metrics.map((m) => m.totalInput)),
+    p95TotalInput: percentile(metrics.map((m) => m.totalInput), 0.95),
+    medianHitRate: median(metrics.map((m) => m.hitRate)),
+    medianRequestCount: median(metrics.map((m) => m.requestCount)),
+    p95RequestCount: percentile(metrics.map((m) => m.requestCount), 0.95),
+    medianMaxContext: median(metrics.map((m) => m.maxContextPerRequest)),
+  };
+}
+
+/**
+ * Diagnose one session against a baseline. Returns issue codes + supporting
+ * numbers so the formatter can render human-readable messages without
+ * re-computing anything.
+ *
+ * Issue codes:
+ *   LARGE_INPUT_PER_REQUEST  — likely 1M context mode; avg input per request
+ *                              is 8x+ baseline or max req context > 250k
+ *   LOW_HIT_RATE             — below 0.5 and baseline was meaningfully higher
+ *   BUCKET_5M_DOMINANT       — 5m TTL writes dominate (>70%); prefix re-writes
+ *   HIGH_OUTPUT_RATIO        — output/input ratio > 0.15 (unusually chatty)
+ *   HIGH_REQUEST_COUNT       — request count > 3x baseline
+ *   FREQUENT_CACHE_REBUILD   — cacheCreation > cacheRead (cache not reused)
+ */
+export function diagnoseSession(metrics, baseline) {
+  const issues = [];
+  if (!metrics || metrics.requestCount === 0) return issues;
+
+  const b = baseline?.enough ? baseline : null;
+
+  if (metrics.maxContextPerRequest > 250_000 ||
+      (b && b.medianAvgInputPerReq > 0 && metrics.avgInputPerReq > b.medianAvgInputPerReq * 8)) {
+    issues.push({
+      code: 'LARGE_INPUT_PER_REQUEST',
+      avgInputPerReq: metrics.avgInputPerReq,
+      maxContextPerRequest: metrics.maxContextPerRequest,
+      baseline: b?.medianAvgInputPerReq,
+    });
+  }
+
+  if (metrics.hitRate < 0.5 && (!b || b.medianHitRate > metrics.hitRate + 0.2)) {
+    issues.push({
+      code: 'LOW_HIT_RATE',
+      hitRate: metrics.hitRate,
+      baseline: b?.medianHitRate,
+    });
+  }
+
+  if (metrics.pct5m > 0.7 && (metrics.totals.ephemeral5m + metrics.totals.ephemeral1h) > 0) {
+    issues.push({
+      code: 'BUCKET_5M_DOMINANT',
+      pct5m: metrics.pct5m,
+    });
+  }
+
+  if (metrics.outputRatio > 0.15) {
+    issues.push({
+      code: 'HIGH_OUTPUT_RATIO',
+      outputRatio: metrics.outputRatio,
+    });
+  }
+
+  if (b && metrics.requestCount > b.medianRequestCount * 3 && metrics.requestCount > 30) {
+    issues.push({
+      code: 'HIGH_REQUEST_COUNT',
+      requestCount: metrics.requestCount,
+      baseline: b.medianRequestCount,
+    });
+  }
+
+  if (metrics.writeToReadRatio !== Infinity &&
+      metrics.writeToReadRatio > 1 &&
+      metrics.totals.cacheCreation > 100_000) {
+    issues.push({
+      code: 'FREQUENT_CACHE_REBUILD',
+      writeToReadRatio: metrics.writeToReadRatio,
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Find sessions in the recent window whose token totals are >= multiplier x
+ * the baseline p95. Returns spikes sorted by severity (largest first) with
+ * diagnosis attached.
+ */
+export function detectSpikes(sessions, { recentHours = 24, multiplier = 3 } = {}) {
+  const baseline = computeBaseline(sessions, recentHours * 60 * 60 * 1000);
+  const cutoff = Date.now() - recentHours * 60 * 60 * 1000;
+  const recent = sessions.filter(
+    (s) => s.startTime && s.startTime.getTime() >= cutoff && s.requestCount > 0,
+  );
+
+  const spikes = [];
+  for (const s of recent) {
+    const m = sessionMetrics(s);
+    // Need a floor so tiny sessions with a few hundred tokens don't register
+    // as spikes just because baseline is also small.
+    if (m.totalInput < 1_000_000) continue;
+
+    const ratio = baseline.enough && baseline.p95TotalInput > 0
+      ? m.totalInput / baseline.p95TotalInput
+      : null;
+
+    const isSpike =
+      (ratio !== null && ratio >= multiplier) ||
+      m.maxContextPerRequest > 250_000;
+
+    if (!isSpike) continue;
+
+    spikes.push({
+      metrics: m,
+      ratio,
+      issues: diagnoseSession(m, baseline),
+    });
+  }
+
+  spikes.sort((a, b) => b.metrics.totalInput - a.metrics.totalInput);
+  return { baseline, spikes };
+}
+
+/**
+ * Detect the likely context-window setting from the largest single-request
+ * context seen in the recent window. Claude Code's two modes are 200k (default)
+ * and 1M (Opus 4.7+ auto-enabled on Max). If max single-request context passes
+ * the 200k ceiling, the user has 1M turned on.
+ *
+ * Returns { size: '1M' | '200k' | 'unknown', maxContext, source }.
+ */
+export function detectContextWindow(sessions, { recentHours = 24 } = {}) {
+  const cutoff = Date.now() - recentHours * 60 * 60 * 1000;
+  const recent = sessions.filter(
+    (s) => s.endTime && s.endTime.getTime() >= cutoff && s.requestCount > 0,
+  );
+  const pool = recent.length > 0 ? recent : sessions;
+  const maxContext = pool.reduce(
+    (m, s) => Math.max(m, s.maxContextPerRequest || 0),
+    0,
+  );
+  if (maxContext === 0) return { size: 'unknown', maxContext, source: 'no-data' };
+  // 200_000 is the hard ceiling for the standard window. Anything materially
+  // over that means the 1M context is in play. Use 210k for a small safety
+  // margin against rounding/metadata tokens.
+  if (maxContext > 210_000) return { size: '1M', maxContext, source: recent.length > 0 ? 'recent' : 'all' };
+  return { size: '200k', maxContext, source: recent.length > 0 ? 'recent' : 'all' };
+}
+
+/**
  * Overall summary
  */
 export function summary(sessions) {

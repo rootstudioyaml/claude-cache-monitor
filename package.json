@@ -1,7 +1,7 @@
 {
   "name": "claude-cache-monitor",
-  "version": "1.4.1",
-  "description": "Monitor prompt cache hit rates for Claude Code sessions (with statusline + TTL countdown)",
+  "version": "1.5.0",
+  "description": "Save tokens on Claude Code — spike diagnosis, 1M-context detection, TTL countdown, statusline",
   "type": "module",
   "bin": {
     "claude-cache-monitor": "./bin/cli.js"
@@ -23,7 +23,10 @@
     "prompt-caching",
     "cli",
     "statusline",
-    "claude-code"
+    "claude-code",
+    "token-usage",
+    "cost-savings",
+    "1m-context"
   ],
   "license": "MIT",
   "repository": {
